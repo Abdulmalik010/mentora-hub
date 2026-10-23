@@ -14,11 +14,11 @@ export interface Slot {
 }
 
 export interface DayAvailability {
-  dateKey: string; // e.g. "2024-10-25"
-  dayName: string; // e.g. "Wed"
-  dateNum: string; // e.g. "25"
-  monthName: string; // e.g. "Oct"
-  slotsCount: string; // e.g. "4 slots"
+  dateKey: string;
+  dayName: string;
+  dateNum: string;
+  monthName: string;
+  slotsCount: string;
   slots: Slot[];
 }
 
@@ -38,13 +38,13 @@ export interface Expert {
   mentoringHours: number;
   scholarsGuided: number;
   yearsExperience: number;
-  hourlyRate: number; // e.g. 90
-  asyncRate: number; // e.g. 65
-  nextSlotText: string; // "Tomorrow, 2:30 PM EST"
-  nextSlotTime: string; // "2:30 PM - 3:15 PM"
-  nextSlotDate: string; // "Wed, Oct 25"
-  matchScore: number; // e.g. 98
-  matchLabel: string; // e.g. "98% Match • Top Faculty"
+  hourlyRate: number; // in Naira (₦5,000 - ₦25,000)
+  asyncRate: number; // in Naira
+  nextSlotText: string;
+  nextSlotTime: string;
+  nextSlotDate: string;
+  matchScore: number;
+  matchLabel: string;
   badgeVariant?: 'top' | 'fellow' | 'visiting';
   subsidyEligible: boolean;
   subsidyLabel: string;
@@ -54,6 +54,56 @@ export interface Expert {
   bio: string;
   reviews: Review[];
   days: DayAvailability[];
+}
+
+export interface InitialSession {
+  id: string;
+  expertId: string;
+  expertName: string;
+  expertTitle: string;
+  expertInstitution: string;
+  expertAvatar: string;
+  format: 'video' | 'async';
+  formatTitle: string;
+  duration: string;
+  scheduledDate: string;
+  scheduledTime: string;
+  timezone: string;
+  status: 'upcoming' | 'completed' | 'cancelled';
+  consultationTopic: string;
+  consultationNotes: string;
+  roomUrl: string;
+  pricePaid: number;
+  originalRate: number;
+  platformFee: number;
+  subsidyDiscount: number;
+  paymentMethod: string;
+  cardLast4?: string;
+  bookingId: string;
+  createdAt: string;
+  checklist: {
+    id: string;
+    label: string;
+    subtext?: string;
+    isDone: boolean;
+    file?: { name: string; size: string };
+  }[];
+  rating?: number;
+  feedback?: string;
+}
+
+export function formatNaira(amount: number): string {
+  try {
+    const formatted = new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+    return formatted.replace('NGN', '₦').trim();
+  } catch {
+    return `₦${amount.toLocaleString('en-NG')}`;
+  }
 }
 
 export const INITIAL_EXPERTS: Expert[] = [
@@ -73,8 +123,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 940,
     scholarsGuided: 310,
     yearsExperience: 14,
-    hourlyRate: 90,
-    asyncRate: 65,
+    hourlyRate: 18000,
+    asyncRate: 12000,
     nextSlotText: 'Tomorrow, 2:30 PM EST',
     nextSlotTime: '2:30 PM - 3:15 PM',
     nextSlotDate: 'Wed, Oct 25',
@@ -189,8 +239,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 410,
     scholarsGuided: 180,
     yearsExperience: 9,
-    hourlyRate: 110,
-    asyncRate: 75,
+    hourlyRate: 22000,
+    asyncRate: 15000,
     nextSlotText: 'Thursday, 10:00 AM PST',
     nextSlotTime: '10:00 AM - 10:45 AM',
     nextSlotDate: 'Thu, Oct 26',
@@ -247,8 +297,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 580,
     scholarsGuided: 240,
     yearsExperience: 12,
-    hourlyRate: 85,
-    asyncRate: 60,
+    hourlyRate: 7500,
+    asyncRate: 5000,
     nextSlotText: 'Friday, 4:00 PM GMT',
     nextSlotTime: '4:00 PM - 4:45 PM',
     nextSlotDate: 'Fri, Oct 27',
@@ -305,8 +355,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 520,
     scholarsGuided: 195,
     yearsExperience: 16,
-    hourlyRate: 105,
-    asyncRate: 70,
+    hourlyRate: 15000,
+    asyncRate: 10000,
     nextSlotText: 'Tomorrow at 3:00 PM EST',
     nextSlotTime: '3:00 PM - 3:45 PM',
     nextSlotDate: 'Wed, Oct 25',
@@ -363,8 +413,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 600,
     scholarsGuided: 210,
     yearsExperience: 11,
-    hourlyRate: 95,
-    asyncRate: 65,
+    hourlyRate: 5000,
+    asyncRate: 3500,
     nextSlotText: 'Available Thu, 1:00 PM PST',
     nextSlotTime: '1:00 PM - 1:45 PM',
     nextSlotDate: 'Thu, Oct 26',
@@ -421,8 +471,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 380,
     scholarsGuided: 160,
     yearsExperience: 18,
-    hourlyRate: 120,
-    asyncRate: 80,
+    hourlyRate: 25000,
+    asyncRate: 17500,
     nextSlotText: 'Friday, 11:30 AM EST',
     nextSlotTime: '11:30 AM - 12:15 PM',
     nextSlotDate: 'Fri, Oct 27',
@@ -479,8 +529,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 340,
     scholarsGuided: 130,
     yearsExperience: 13,
-    hourlyRate: 100,
-    asyncRate: 70,
+    hourlyRate: 10000,
+    asyncRate: 7000,
     nextSlotText: 'Monday, 2:00 PM GMT',
     nextSlotTime: '2:00 PM - 2:45 PM',
     nextSlotDate: 'Mon, Oct 30',
@@ -537,8 +587,8 @@ export const INITIAL_EXPERTS: Expert[] = [
     mentoringHours: 720,
     scholarsGuided: 275,
     yearsExperience: 15,
-    hourlyRate: 115,
-    asyncRate: 75,
+    hourlyRate: 20000,
+    asyncRate: 14000,
     nextSlotText: 'Wednesday, 4:00 PM EST',
     nextSlotTime: '4:00 PM - 4:45 PM',
     nextSlotDate: 'Wed, Oct 25',
@@ -581,40 +631,6 @@ export const INITIAL_EXPERTS: Expert[] = [
   }
 ];
 
-export interface InitialSession {
-  id: string;
-  expertId: string;
-  expertName: string;
-  expertTitle: string;
-  expertInstitution: string;
-  expertAvatar: string;
-  format: 'video' | 'async';
-  formatTitle: string;
-  duration: string;
-  scheduledDate: string;
-  scheduledTime: string;
-  timezone: string;
-  status: 'upcoming' | 'completed' | 'cancelled';
-  consultationTopic: string;
-  consultationNotes: string;
-  roomUrl: string;
-  pricePaid: number;
-  originalRate: number;
-  platformFee: number;
-  subsidyDiscount: number;
-  paymentMethod: string;
-  cardLast4?: string;
-  bookingId: string;
-  createdAt: string;
-  checklist: {
-    id: string;
-    label: string;
-    subtext?: string;
-    isDone: boolean;
-    file?: { name: string; size: string };
-  }[];
-}
-
 export const INITIAL_SESSIONS: InitialSession[] = [
   {
     id: 'session-vance-1',
@@ -633,10 +649,10 @@ export const INITIAL_SESSIONS: InitialSession[] = [
     consultationTopic: 'Thesis Review with Dr. Vance: Autonomous Neural Kinematics',
     consultationNotes: 'Reviewing chapter on reinforcement learning for legged stabilization on uneven terrains.',
     roomUrl: 'mentora.ai/room/marcus-vance-3821',
-    pricePaid: 95.0,
-    originalRate: 105.0,
-    platformFee: 5.0,
-    subsidyDiscount: 15.0,
+    pricePaid: 18000,
+    originalRate: 20000,
+    platformFee: 1000,
+    subsidyDiscount: 3000,
     paymentMethod: 'Credit Card •••• 4242',
     cardLast4: '4242',
     bookingId: '#MEN-7241-MV',
@@ -660,6 +676,39 @@ export const INITIAL_SESSIONS: InitialSession[] = [
         label: 'Prepare 3 focal questions on trajectory optimization',
         subtext: 'Ready for discussion',
         isDone: false
+      }
+    ]
+  },
+  {
+    id: 'session-completed-1',
+    expertId: 'henrik-dahlgren',
+    expertName: 'Dr. Henrik Dahlgren',
+    expertTitle: 'Chair of Behavioral Data Science & Econometrics',
+    expertInstitution: 'London School of Economics & Turing Institute',
+    expertAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAYXQaOdGLSwD6CvUNKCjlVP6EVOzEVVMfX0GftIAGJPfNjaBe_-O2aoCbrEu3AzKuVCAVIKcmIH5sM8MjjsmekScLv5BVWCEJbWd3Xtt112lhW8CxVzNDKBOpv0tnne7YBkidxmsx24Uf9udv7X1T3D7-w3879hrb_lHwJ7mHqd9XdkHks4QLoTw02A_fSQFdnTE9fBRPB0kiPnX15ybSPyueisoZ3_GIEcqRfk1LX57-0eahJo-Mq',
+    format: 'video',
+    formatTitle: '1:1 Video Consultation (45 mins)',
+    duration: '45 mins',
+    scheduledDate: 'Yesterday (Mon, Oct 23)',
+    scheduledTime: '2:00 PM – 2:45 PM GMT',
+    timezone: 'GMT (UTC+0)',
+    status: 'completed',
+    consultationTopic: 'Quasi-Experimental Difference-in-Differences Audit',
+    consultationNotes: 'Reviewed identification strategy and synthetic controls for dissertation Chapter 2.',
+    roomUrl: 'mentora.ai/room/henrik-dahlgren-9912',
+    pricePaid: 5000,
+    originalRate: 5000,
+    platformFee: 1000,
+    subsidyDiscount: 1000,
+    paymentMethod: 'Bank Transfer •••• 8192',
+    cardLast4: '8192',
+    bookingId: '#MEN-5109-HD',
+    createdAt: '2024-10-20',
+    checklist: [
+      {
+        id: 'chk-c1',
+        label: 'Dataset pre-processed and shared in notebook',
+        isDone: true
       }
     ]
   }

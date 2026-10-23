@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Expert } from '../data/expertsData';
+import { Expert, formatNaira } from '../data/expertsData';
 
 interface ExpertProfileScreenProps {
   expert: Expert;
@@ -39,7 +39,7 @@ export const ExpertProfileScreen: React.FC<ExpertProfileScreenProps> = ({
   };
 
   return (
-    <main className="flex flex-col relative w-full pt-16 pb-28 bg-[#f8f9ff] flex-1 max-w-lg mx-auto">
+    <main className="flex flex-col relative w-full pt-4 pb-28 bg-[#f8f9ff] flex-1 max-w-3xl mx-auto">
       <div className="flex flex-col w-full px-4 pb-6 space-y-4">
         {/* Hero Profile Card */}
         <section className="bg-[#ffffff] rounded-2xl p-4 shadow-sm border border-[#e2e8f0]/80 relative overflow-hidden">
@@ -369,7 +369,7 @@ export const ExpertProfileScreen: React.FC<ExpertProfileScreenProps> = ({
               Mentorship Rate
             </span>
             <div className="flex items-baseline gap-1">
-              <span className="text-[24px] font-extrabold text-[#001428]">${expert.hourlyRate}</span>
+              <span className="text-[24px] font-extrabold text-[#001428]">{formatNaira(expert.hourlyRate)}</span>
               <span className="text-[12px] text-[#43474d]">/ session</span>
             </div>
           </div>

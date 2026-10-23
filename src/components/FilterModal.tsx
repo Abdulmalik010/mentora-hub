@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatNaira } from '../data/expertsData';
 
 interface FilterModalProps {
   isOpen: boolean;
@@ -82,21 +83,21 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               <label className="text-[12px] font-bold text-[#001428] uppercase tracking-wider">
                 Max Rate per Session
               </label>
-              <span className="text-[14px] font-extrabold text-[#a73a00]">${maxPrice} / session</span>
+              <span className="text-[14px] font-extrabold text-[#a73a00]">{formatNaira(maxPrice)} / session</span>
             </div>
             <input
               type="range"
-              min="50"
-              max="150"
-              step="5"
+              min="5000"
+              max="25000"
+              step="2500"
               value={maxPrice}
               onChange={(e) => onSelectMaxPrice(Number(e.target.value))}
               className="w-full accent-[#fd651e] cursor-pointer"
             />
             <div className="flex justify-between text-[11px] text-[#74777e] mt-1">
-              <span>$50</span>
-              <span>$100</span>
-              <span>$150+</span>
+              <span>{formatNaira(5000)}</span>
+              <span>{formatNaira(15000)}</span>
+              <span>{formatNaira(25000)}</span>
             </div>
           </div>
 
@@ -106,7 +107,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 <span className="material-symbols-outlined text-[#a73a00] text-[20px]">school</span>
                 <div>
                   <p className="text-[13px] font-bold text-[#001428]">Mentora Doctoral Subsidy</p>
-                  <p className="text-[11px] text-[#43474d]">Show only sessions eligible for $15-$20 grant reduction</p>
+                  <p className="text-[11px] text-[#43474d]">Show only sessions eligible for ₦3,000 grant reduction</p>
                 </div>
               </div>
               <input
@@ -125,7 +126,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             type="button"
             onClick={() => {
               onSelectDomain('All Disciplines');
-              onSelectMaxPrice(130);
+              onSelectMaxPrice(25000);
               onClose();
             }}
             className="flex-1 py-2.5 rounded-xl border border-[#c3c6ce] text-[#001428] text-[13px] font-bold hover:bg-[#e5eeff]"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Expert } from '../data/expertsData';
+import { Expert, formatNaira } from '../data/expertsData';
 
 interface ConfirmationScreenProps {
   expert: Expert;
@@ -83,7 +83,7 @@ export const ConfirmationScreen: React.FC<ConfirmationScreenProps> = ({
   const completedCount = checklist.filter((c) => c.isDone).length;
 
   return (
-    <main className="flex-1 flex flex-col relative w-full pt-24 bg-[#f8f9ff] pb-safe max-w-lg mx-auto">
+    <main className="flex-1 flex flex-col relative w-full pt-8 bg-[#f8f9ff] pb-safe max-w-3xl mx-auto">
       <div className="flex flex-col w-full px-4 py-3 space-y-5 relative overflow-hidden">
         {/* Subtle Ambient Glow */}
         <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#fd651e]/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -279,10 +279,10 @@ export const ConfirmationScreen: React.FC<ConfirmationScreenProps> = ({
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-[16px] font-bold text-[#001428]">
-                  ${bookingInfo.totalPaid.toFixed(2)}
+                <span className="text-[17px] font-extrabold text-[#001428]">
+                  {formatNaira(bookingInfo.totalPaid)}
                 </span>
-                <span className="text-[10px] text-[#fd651e] font-bold block leading-none">
+                <span className="text-[10px] text-emerald-700 font-bold block leading-none">
                   Receipt Emailed
                 </span>
               </div>

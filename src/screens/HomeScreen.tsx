@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Expert } from '../data/expertsData';
+import { Expert, formatNaira } from '../data/expertsData';
 
 interface HomeScreenProps {
   onNavigate: (screen: string) => void;
@@ -56,7 +56,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   return (
-    <main className="flex flex-col relative w-full pt-18 pb-24 bg-[#f8f9ff] flex-1 min-h-screen max-w-lg mx-auto">
+    <main className="flex flex-col relative w-full pt-4 pb-24 bg-[#f8f9ff] flex-1 min-h-screen max-w-6xl mx-auto">
       <div className="flex flex-col w-full px-4 space-y-4">
         {/* 1. Warm Greeting & Streak Banner */}
         <div className="flex items-center justify-between pt-1">
@@ -282,81 +282,85 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </button>
           </div>
 
-          {/* Top Mentor Cards */}
-          {experts.slice(0, 3).map((mentor) => (
-            <div
-              key={mentor.id}
-              className="w-full bg-[#ffffff] rounded-2xl p-4 shadow-[0_2px_12px_rgba(15,41,66,0.05)] border border-[#e2e8f0]/70 space-y-3.5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div
-                  onClick={() => onSelectExpert(mentor)}
-                  className="flex items-center gap-3 min-w-0 cursor-pointer group"
-                >
-                  <div className="relative shrink-0">
-                    <img
-                      className="w-13 h-13 rounded-2xl object-cover ring-2 ring-[#d1e4ff] group-hover:scale-105 transition-transform"
-                      src={mentor.avatarUrl}
-                      alt={mentor.name}
-                    />
-                    <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#001428] flex items-center justify-center text-white">
-                      <span className="material-symbols-outlined text-[13px]">check</span>
+          {/* Top Mentor Cards in Responsive Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {experts.slice(0, 3).map((mentor) => (
+              <div
+                key={mentor.id}
+                className="w-full bg-[#ffffff] rounded-2xl p-4 shadow-[0_2px_12px_rgba(15,41,66,0.05)] border border-[#e2e8f0]/70 space-y-3.5 flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      onClick={() => onSelectExpert(mentor)}
+                      className="flex items-center gap-3 min-w-0 cursor-pointer group"
+                    >
+                      <div className="relative shrink-0">
+                        <img
+                          className="w-13 h-13 rounded-2xl object-cover ring-2 ring-[#d1e4ff] group-hover:scale-105 transition-transform"
+                          src={mentor.avatarUrl}
+                          alt={mentor.name}
+                        />
+                        <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[#001428] flex items-center justify-center text-white">
+                          <span className="material-symbols-outlined text-[13px]">check</span>
+                        </span>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <h3 className="text-[16px] font-bold text-[#0b1c30] group-hover:text-[#a73a00] transition-colors truncate">
+                          {mentor.name}
+                        </h3>
+                        <p className="text-[12px] text-[#43474d] truncate">{mentor.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-[#e5eeff] text-[11px] font-bold text-[#0f2942]">
+                            <span
+                              className="material-symbols-outlined text-[14px] text-[#a73a00]"
+                              style={{ fontVariationSettings: "'FILL' 1" }}
+                            >
+                              star
+                            </span>
+                            <span>{mentor.rating.toFixed(2)}</span>
+                          </span>
+                          <span className="text-[11px] text-[#74777e]">{mentor.reviewCount}+ reviews</span>
+                          <span className="text-[11px] text-[#74777e]">•</span>
+                          <span className="text-[11px] font-bold text-[#001428]">{formatNaira(mentor.hourlyRate)}/45m</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="shrink-0 px-2.5 py-1 rounded-full bg-[#ffdbce] text-[#370e00] text-[11px] font-bold">
+                      {mentor.nextSlotDate}
                     </span>
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <h3 className="text-[16px] font-bold text-[#0b1c30] group-hover:text-[#a73a00] transition-colors truncate">
-                      {mentor.name}
-                    </h3>
-                    <p className="text-[12px] text-[#43474d] truncate">{mentor.title}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-[#e5eeff] text-[11px] font-bold text-[#0f2942]">
-                        <span
-                          className="material-symbols-outlined text-[14px] text-[#a73a00]"
-                          style={{ fontVariationSettings: "'FILL' 1" }}
-                        >
-                          star
-                        </span>
-                        <span>{mentor.rating.toFixed(2)}</span>
-                      </span>
-                      <span className="text-[11px] text-[#74777e]">{mentor.reviewCount}+ reviews</span>
-                      <span className="text-[11px] text-[#74777e]">•</span>
-                      <span className="text-[11px] font-bold text-[#001428]">${mentor.hourlyRate}/45m</span>
-                    </div>
+
+                  {/* Specialization snippet */}
+                  <div className="bg-[#eff4ff] rounded-xl p-2.5 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#a73a00] text-[18px] shrink-0">lightbulb</span>
+                    <p className="text-[12px] text-[#43474d] truncate">
+                      Specialization: {mentor.specializations[0]} & {mentor.specializations[1]}
+                    </p>
                   </div>
                 </div>
 
-                <span className="shrink-0 px-2.5 py-1 rounded-full bg-[#ffdbce] text-[#370e00] text-[11px] font-bold">
-                  {mentor.nextSlotDate}
-                </span>
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => onBookExpert(mentor)}
+                    className="flex-1 py-2.5 px-3 rounded-xl bg-[#001428] text-white text-[13px] font-semibold text-center hover:bg-[#0f2942] active:scale-95 transition-all shadow-xs"
+                  >
+                    Book 1:1 Session
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Ask ${mentor.name} a question`}
+                    onClick={() => onOpenAIChatWithPrompt(`Connect with ${mentor.name} regarding research methodology`)}
+                    className="py-2.5 px-3 rounded-xl bg-[#e5eeff] text-[#0f2942] text-[13px] font-semibold flex items-center justify-center hover:bg-[#dce9ff] active:scale-95 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">chat</span>
+                  </button>
+                </div>
               </div>
-
-              {/* Specialization snippet */}
-              <div className="bg-[#eff4ff] rounded-xl p-2.5 flex items-center gap-2">
-                <span className="material-symbols-outlined text-[#a73a00] text-[18px]">lightbulb</span>
-                <p className="text-[12px] text-[#43474d] truncate">
-                  Specialization: {mentor.specializations[0]} & {mentor.specializations[1]}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => onBookExpert(mentor)}
-                  className="flex-1 py-2.5 px-3 rounded-xl bg-[#001428] text-white text-[13px] font-semibold text-center hover:bg-[#0f2942] active:scale-95 transition-all shadow-xs"
-                >
-                  Book 1:1 Session
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Ask ${mentor.name} a question`}
-                  onClick={() => onOpenAIChatWithPrompt(`Connect with ${mentor.name} regarding research methodology`)}
-                  className="py-2.5 px-3 rounded-xl bg-[#e5eeff] text-[#0f2942] text-[13px] font-semibold flex items-center justify-center hover:bg-[#dce9ff] active:scale-95 transition-all"
-                >
-                  <span className="material-symbols-outlined text-[18px]">chat</span>
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </main>

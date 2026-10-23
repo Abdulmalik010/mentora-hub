@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Expert } from '../data/expertsData';
+import { Expert, formatNaira } from '../data/expertsData';
 
 interface BookingScreenProps {
   expert: Expert;
@@ -60,10 +60,10 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
     'Reviewing dissertation chapter 3 on rotated surface codes error threshold simulations.'
   );
 
-  // Pricing calculations
+  // Pricing calculations in Naira
   const baseRate = format === 'video' ? expert.hourlyRate : expert.asyncRate;
-  const platformFee = 5.0;
-  const subsidyDiscount = expert.subsidyEligible ? 15.0 : 0.0;
+  const platformFee = 1000;
+  const subsidyDiscount = expert.subsidyEligible ? 3000 : 0;
   const totalDue = Math.max(0, baseRate + platformFee - subsidyDiscount);
 
   const handleDateChange = (idx: number) => {
@@ -95,7 +95,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
   const afternoonSlots = currentDay.slots.filter((s) => s.period === 'afternoon');
 
   return (
-    <main className="flex-1 flex flex-col relative w-full pt-24 bg-[#f8f9ff] pb-safe max-w-lg mx-auto">
+    <main className="flex-1 flex flex-col relative w-full pt-4 bg-[#f8f9ff] pb-safe max-w-3xl mx-auto">
       <div className="flex flex-col w-full pb-40">
         {/* Top Mentor Context Strip */}
         <div className="px-4 pt-3 pb-3">
@@ -435,11 +435,11 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
             <div className="space-y-1.5 text-[13px] pt-1 border-t border-[#f1f5f9]">
               <div className="flex justify-between text-[#43474d]">
                 <span>Base Advisory Fee</span>
-                <span className="font-semibold text-[#0b1c30]">${baseRate.toFixed(2)}</span>
+                <span className="font-semibold text-[#0b1c30]">{formatNaira(baseRate)}</span>
               </div>
               <div className="flex justify-between text-[#43474d]">
                 <span>Mentora Platform & Live Tooling</span>
-                <span className="font-semibold text-[#0b1c30]">${platformFee.toFixed(2)}</span>
+                <span className="font-semibold text-[#0b1c30]">{formatNaira(platformFee)}</span>
               </div>
               {expert.subsidyEligible && (
                 <div className="flex justify-between text-[#a73a00] font-medium">
@@ -447,12 +447,12 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
                     <span className="material-symbols-outlined text-[14px]">school</span>
                     Doctoral Subsidy (Mentora Grant)
                   </span>
-                  <span className="font-bold">-${subsidyDiscount.toFixed(2)}</span>
+                  <span className="font-bold">-{formatNaira(subsidyDiscount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-[15px] font-bold text-[#001428] pt-2 border-t border-[#e2e8f0]">
                 <span>Estimated Total Due</span>
-                <span className="text-[18px] font-extrabold text-[#001428]">${totalDue.toFixed(2)}</span>
+                <span className="text-[18px] font-extrabold text-[#001428]">{formatNaira(totalDue)}</span>
               </div>
             </div>
           </section>
@@ -524,7 +524,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
 
         {/* Sticky Bottom Action Bar */}
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#ffffff]/95 backdrop-blur-xl shadow-[0_-4px_20px_rgba(15,41,66,0.08)] px-4 py-3 pb-safe border-t border-[#e2e8f0]">
-          <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-3">
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1 text-[#43474d]">
                 <span className="material-symbols-outlined text-[14px] text-[#a73a00]">
@@ -535,7 +535,7 @@ export const BookingScreen: React.FC<BookingScreenProps> = ({
                 </span>
               </div>
               <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-[22px] font-extrabold text-[#0b1c30]">${totalDue.toFixed(2)}</span>
+                <span className="text-[22px] font-extrabold text-[#0b1c30]">{formatNaira(totalDue)}</span>
                 <span className="text-[11px] text-[#74777e]">total due</span>
               </div>
               <span className="text-[11px] text-[#a73a00] font-bold truncate">

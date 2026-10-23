@@ -33,6 +33,188 @@ export const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   }
 ];
 
+export function getFallbackRecommendations(text: string, allExperts: Expert[]): Expert[] {
+  const lower = text.toLowerCase();
+  if (lower.includes('quantum') || lower.includes('surface') || lower.includes('qubit')) {
+    return [
+      allExperts.find((e) => e.id === 'aris-thorne') || allExperts[0],
+      allExperts.find((e) => e.id === 'maya-lin') || allExperts[1],
+      allExperts.find((e) => e.id === 'marcus-vance') || allExperts[3]
+    ].filter(Boolean);
+  } else if (lower.includes('robot') || lower.includes('autonomous') || lower.includes('kinematic')) {
+    return [
+      allExperts.find((e) => e.id === 'marcus-vance') || allExperts[3],
+      allExperts.find((e) => e.id === 'maya-lin') || allExperts[1],
+      allExperts.find((e) => e.id === 'aris-thorne') || allExperts[0]
+    ].filter(Boolean);
+  } else if (lower.includes('bio') || lower.includes('crispr') || lower.includes('genom') || lower.includes('cancer')) {
+    return [
+      allExperts.find((e) => e.id === 'amara-okafor') || allExperts[2],
+      allExperts.find((e) => e.id === 'rachel-ben-ami') || allExperts[7],
+      allExperts.find((e) => e.id === 'henrik-dahlgren') || allExperts[6]
+    ].filter(Boolean);
+  } else if (lower.includes('neuro') || lower.includes('brain') || lower.includes('bci')) {
+    return [
+      allExperts.find((e) => e.id === 'rachel-ben-ami') || allExperts[7],
+      allExperts.find((e) => e.id === 'amara-okafor') || allExperts[2],
+      allExperts.find((e) => e.id === 'marcus-vance') || allExperts[3]
+    ].filter(Boolean);
+  } else if (lower.includes('law') || lower.includes('copyright') || lower.includes('policy')) {
+    return [
+      allExperts.find((e) => e.id === 'julian-sterling') || allExperts[5],
+      allExperts.find((e) => e.id === 'sarah-lin') || allExperts[4],
+      allExperts.find((e) => e.id === 'henrik-dahlgren') || allExperts[6]
+    ].filter(Boolean);
+  } else if (lower.includes('product') || lower.includes('business') || lower.includes('venture')) {
+    return [
+      allExperts.find((e) => e.id === 'sarah-lin') || allExperts[4],
+      allExperts.find((e) => e.id === 'marcus-vance') || allExperts[3],
+      allExperts.find((e) => e.id === 'julian-sterling') || allExperts[5]
+    ].filter(Boolean);
+  } else {
+    return [
+      allExperts.find((e) => e.id === 'henrik-dahlgren') || allExperts[6],
+      allExperts.find((e) => e.id === 'aris-thorne') || allExperts[0],
+      allExperts.find((e) => e.id === 'amara-okafor') || allExperts[2]
+    ].filter(Boolean);
+  }
+}
+
+async function simulatedWordStream(
+  message: string,
+  allExperts: Expert[],
+  onChunk: (accumulatedText: string) => void
+): Promise<{
+  text: string;
+  recommendedExperts: Expert[];
+  quickPrompts: string[];
+}> {
+  const queryLower = message.toLowerCase();
+  const isQuestionNeeded =
+    !queryLower.includes('phd') &&
+    !queryLower.includes('master') &&
+    !queryLower.includes('undergrad') &&
+    !queryLower.includes('thesis') &&
+    !queryLower.includes('defense') &&
+    !queryLower.includes('grant') &&
+    !queryLower.includes('paper');
+
+  let fullReply = '';
+  let recs: Expert[] = [];
+  let quickPrompts: string[] = [];
+
+  if (isQuestionNeeded) {
+    fullReply = `I would love to help you explore ${message}! Are you currently preparing for an undergraduate thesis, a master's thesis, a doctoral defense, or a professional fellowship review?`;
+    quickPrompts = ['PhD Doctoral Candidate', "Master's Student", 'Undergraduate Researcher', 'Industry Fellow'];
+  } else {
+    recs = getFallbackRecommendations(message, allExperts);
+    const names = recs.map((r) => r.name).join(' and ');
+    fullReply = `Based on your research goals in ${message}, I recommend consulting with ${names}. Their active laboratory investigations directly align with your thesis objectives. Tap any card below to review their full dossier and book a session:`;
+    quickPrompts = ['Compare faculty availability', 'Check doctoral grant subsidy', 'Draft research inquiry'];
+  }
+
+  const words = fullReply.split(' ');
+  let currentText = '';
+  for (let i = 0; i < words.length; i++) {
+    currentText += (i === 0 ? '' : ' ') + words[i];
+    onChunk(currentText);
+    await new Promise((r) => setTimeout(r, 22));
+  }
+
+  return {
+    text: fullReply,
+    recommendedExperts: recs,
+    quickPrompts
+  };
+}
+
+export async function streamGeminiChat(
+  message: string,
+  history: { role: 'user' | 'model'; text: string }[],
+  academicLevel: string,
+  interests: string[],
+  allExperts: Expert[],
+  onChunk: (textSoFar: string) => void
+): Promise<{
+  text: string;
+  recommendedExperts: Expert[];
+  quickPrompts: string[];
+}> {
+  let accumulated = '';
+  try {
+    const res = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        history: history.slice(-6),
+        academicLevel,
+        interests
+      })
+    });
+
+    if (!res.ok || !res.body) {
+      throw new Error(`SSE stream HTTP error ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let recommendedExpertIds: string[] = [];
+    let quickPrompts: string[] = [];
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data: ')) continue;
+        const payloadStr = trimmed.slice(6);
+        try {
+          const data = JSON.parse(payloadStr);
+          if (data.chunk) {
+            accumulated += data.chunk;
+            const displayText = accumulated.replace(/\[RECOMMENDED:\s*[^\]]*\]?/i, '').trim();
+            onChunk(displayText);
+          }
+          if (data.done) {
+            if (Array.isArray(data.recommendedExpertIds)) {
+              recommendedExpertIds = data.recommendedExpertIds;
+            }
+            if (Array.isArray(data.quickPrompts)) {
+              quickPrompts = data.quickPrompts;
+            }
+          }
+        } catch {
+          // ignore json parse error on partial lines
+        }
+      }
+    }
+
+    const cleanFinalText = accumulated.replace(/\[RECOMMENDED:\s*[^\]]*\]?/i, '').trim();
+    let recommendedExperts: Expert[] = recommendedExpertIds
+      .map((id) => allExperts.find((e) => e.id === id))
+      .filter((e): e is Expert => Boolean(e));
+
+    if (recommendedExperts.length === 0 && accumulated.includes('recommend')) {
+      recommendedExperts = getFallbackRecommendations(cleanFinalText, allExperts);
+    }
+
+    return {
+      text: cleanFinalText || accumulated,
+      recommendedExperts: recommendedExperts.slice(0, 3),
+      quickPrompts: quickPrompts.length > 0 ? quickPrompts : ['Compare faculty availability', 'Check doctoral grant subsidy']
+    };
+  } catch (err) {
+    console.warn('Backend stream failed, using client simulated word stream:', err);
+    return simulatedWordStream(message, allExperts, onChunk);
+  }
+}
+
 export async function callGeminiChat(
   message: string,
   history: { role: 'user' | 'model'; text: string }[],
@@ -48,7 +230,7 @@ export async function callGeminiChat(
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history, academicLevel, interests })
+      body: JSON.stringify({ message, history: history.slice(-6), academicLevel, interests })
     });
 
     if (!res.ok) {
@@ -62,16 +244,16 @@ export async function callGeminiChat(
 
     return {
       text: data.text || '',
-      recommendedExperts,
+      recommendedExperts: recommendedExperts.length > 0 ? recommendedExperts : getFallbackRecommendations(data.text || message, allExperts),
       quickPrompts: Array.isArray(data.quickPrompts) ? data.quickPrompts : []
     };
   } catch (err) {
     console.warn('API call to /api/chat failed, running fallback advisor logic:', err);
-    const fallback = generateAdvisorResponse(message, allExperts);
+    const recs = getFallbackRecommendations(message, allExperts);
     return {
-      text: fallback.text,
-      recommendedExperts: fallback.expertRecommendation ? [fallback.expertRecommendation] : [allExperts[0]],
-      quickPrompts: ['Compare threshold graphs', 'Find Oxford/Stanford advisors']
+      text: `Based on your research focus, I recommend consulting with our top faculty members in this discipline. All sessions are ₦5,000–₦25,000 per consultation slot.`,
+      recommendedExperts: recs,
+      quickPrompts: ['Compare availability this week', 'Doctoral grant application review']
     };
   }
 }

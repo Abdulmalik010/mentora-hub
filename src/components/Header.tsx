@@ -12,6 +12,8 @@ interface HeaderProps {
   isBookmarked?: boolean;
   onToggleBookmark?: () => void;
   onShare?: () => void;
+  viewMode?: 'phone' | 'desktop';
+  onToggleViewMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,13 +27,37 @@ export const Header: React.FC<HeaderProps> = ({
   stepNumber = 1,
   isBookmarked,
   onToggleBookmark,
-  onShare
+  onShare,
+  viewMode = 'phone',
+  onToggleViewMode
 }) => {
+  const renderViewModeToggle = () => {
+    if (!onToggleViewMode) return null;
+    return (
+      <button
+        type="button"
+        onClick={onToggleViewMode}
+        title={viewMode === 'desktop' ? 'Switch to Phone View' : 'Switch to Desktop View'}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#e5eeff] hover:bg-[#dce9ff] text-[#001428] text-[11px] font-bold shadow-2xs border border-[#d1e4ff] active:scale-95 transition-all"
+      >
+        <span className="material-symbols-outlined text-[15px] text-[#a73a00]">
+          {viewMode === 'desktop' ? 'smartphone' : 'desktop_windows'}
+        </span>
+        <span className="hidden sm:inline">
+          {viewMode === 'desktop' ? 'Phone view' : 'Desktop view'}
+        </span>
+        <span className="sm:hidden">
+          {viewMode === 'desktop' ? 'Phone' : 'Desktop'}
+        </span>
+      </button>
+    );
+  };
+
   // If it's a detail / checkout / booking screen with custom header
   if (['booking', 'payment', 'confirmation'].includes(currentScreen)) {
     return (
-      <header className="fixed top-0 inset-x-0 w-full z-50 pt-safe bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] border-b border-[#e2e8f0]/60">
-        <div className="h-24 px-4 flex flex-col justify-between py-1.5 max-w-lg mx-auto">
+      <header className="sticky top-0 inset-x-0 w-full z-40 bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] border-b border-[#e2e8f0]/60">
+        <div className="h-24 px-4 flex flex-col justify-between py-1.5 max-w-5xl mx-auto">
           <div className="flex items-center justify-between w-full">
             <button
               type="button"
@@ -49,7 +75,8 @@ export const Header: React.FC<HeaderProps> = ({
                 {title || (currentScreen === 'booking' ? 'Schedule Mentorship' : currentScreen === 'payment' ? 'Payment Method' : 'Booking Confirmation')}
               </h1>
             </div>
-            <div className="min-w-[44px] min-h-[44px] flex items-center justify-end">
+            <div className="flex items-center gap-2">
+              {renderViewModeToggle()}
               <button
                 type="button"
                 onClick={() => onNavigate('profile')}
@@ -92,8 +119,8 @@ export const Header: React.FC<HeaderProps> = ({
   // Expert Profile Header
   if (currentScreen === 'expert-profile') {
     return (
-      <header className="fixed top-0 inset-x-0 z-50 bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] pt-safe border-b border-[#e2e8f0]/60">
-        <div className="h-16 px-4 flex items-center justify-between max-w-lg mx-auto">
+      <header className="sticky top-0 inset-x-0 z-40 bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] pt-safe border-b border-[#e2e8f0]/60">
+        <div className="h-16 px-4 flex items-center justify-between max-w-5xl mx-auto">
           <button
             type="button"
             aria-label="Go back"
@@ -105,12 +132,13 @@ export const Header: React.FC<HeaderProps> = ({
           <h1 className="text-[18px] font-bold text-[#001428] tracking-tight truncate max-w-[200px]">
             {title || 'Mentora Expert Profile'}
           </h1>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            {renderViewModeToggle()}
             <button
               type="button"
               aria-label="Bookmark Expert"
               onClick={onToggleBookmark}
-              className={`min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full transition-colors ${
+              className={`min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full transition-colors ${
                 isBookmarked ? 'text-[#a73a00]' : 'text-[#43474d] hover:text-[#001428]'
               }`}
             >
@@ -122,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               aria-label="Share Profile"
               onClick={onShare}
-              className="min-w-[40px] min-h-[40px] flex items-center justify-center text-[#43474d] hover:text-[#001428] transition-colors"
+              className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[#43474d] hover:text-[#001428] transition-colors"
             >
               <span className="material-symbols-outlined text-[22px]">share</span>
             </button>
@@ -132,54 +160,10 @@ export const Header: React.FC<HeaderProps> = ({
     );
   }
 
-  // Onboarding Header
-  if (currentScreen === 'onboarding') {
-    return (
-      <header className="fixed top-0 inset-x-0 z-50 bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] pt-safe border-b border-[#e2e8f0]/60">
-        <div className="h-16 px-4 flex items-center justify-between max-w-lg mx-auto">
-          <div className="flex items-center gap-2">
-            {onBack && (
-              <button
-                type="button"
-                aria-label="Go back"
-                onClick={onBack}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 text-[#0f2942] hover:text-[#001428] transition-colors"
-              >
-                <span className="material-symbols-outlined text-[24px]">arrow_back</span>
-              </button>
-            )}
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-[#0f2942] flex items-center justify-center text-white">
-                <span className="material-symbols-outlined text-[16px]">school</span>
-              </div>
-              <span className="text-[20px] font-bold text-[#001428] tracking-tight">Mentora</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex flex-col items-end">
-              <span className="text-[11px] text-[#43474d] font-medium">Personalize Experience</span>
-              <div className="w-16 h-1.5 bg-[#e5eeff] rounded-full overflow-hidden mt-1">
-                <div className="h-full bg-[#fd651e] rounded-full w-1/2"></div>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('profile')}
-              className="w-8 h-8 rounded-full bg-[#001428] flex items-center justify-center"
-              aria-label="Profile"
-            >
-              <span className="material-symbols-outlined text-white text-[18px]">person</span>
-            </button>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
   // Default Header for Home, Experts, AI Chat, Sessions, Profile
   return (
-    <header className="fixed top-0 w-full z-50 pt-safe bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] border-b border-[#e2e8f0]/60">
-      <div className="h-16 px-4 flex items-center justify-between max-w-lg mx-auto">
+    <header className="sticky top-0 w-full z-40 pt-safe bg-[#f8f9ff]/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(15,41,66,0.04)] border-b border-[#e2e8f0]/60">
+      <div className="h-16 px-4 flex items-center justify-between max-w-5xl mx-auto">
         <div
           onClick={() => onNavigate('home')}
           className="flex items-center gap-2 cursor-pointer select-none"
@@ -188,22 +172,27 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="material-symbols-outlined text-[18px]">school</span>
           </div>
           <span className="text-[20px] font-bold text-[#0f2942] tracking-tight">Mentora</span>
+          <span className="hidden sm:inline text-[11px] font-semibold text-[#a73a00] bg-[#ffdbce] px-2 py-0.5 rounded-full ml-1">
+            Academic Hub
+          </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {renderViewModeToggle()}
+
           <button
             type="button"
             aria-label="Notifications"
             onClick={onOpenNotifications}
-            className="w-10 h-10 flex items-center justify-center rounded-full text-[#43474d] hover:text-[#0f2942] hover:bg-[#e5eeff] transition-colors relative"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-[#43474d] hover:text-[#0f2942] hover:bg-[#e5eeff] transition-colors relative"
           >
-            <span className="material-symbols-outlined text-[24px]">notifications</span>
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#fd651e] animate-pulse"></span>
+            <span className="material-symbols-outlined text-[22px]">notifications</span>
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#fd651e] animate-pulse"></span>
           </button>
           <button
             type="button"
             onClick={() => onNavigate('profile')}
-            className="w-10 h-10 flex items-center justify-center rounded-full transition-transform active:scale-95"
+            className="w-9 h-9 flex items-center justify-center rounded-full transition-transform active:scale-95"
             aria-label="Profile"
           >
             <img

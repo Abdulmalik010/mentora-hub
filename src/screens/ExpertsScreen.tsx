@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Expert } from '../data/expertsData';
+import { Expert, formatNaira } from '../data/expertsData';
 
 interface ExpertsScreenProps {
   onNavigate: (screen: string) => void;
@@ -32,8 +32,8 @@ export const ExpertsScreen: React.FC<ExpertsScreenProps> = ({
     filtered = filtered.filter(
       (e) => e.institution.includes('MIT') || e.institution.includes('Harvard')
     );
-  } else if (activeDomainFilter === 'Under $120/hr') {
-    filtered = filtered.filter((e) => e.hourlyRate <= 100);
+  } else if (activeDomainFilter === 'Under ₦15,000') {
+    filtered = filtered.filter((e) => e.hourlyRate <= 15000);
   } else if (activeDomainFilter === 'Available This Week') {
     filtered = filtered.filter((e) => e.nextSlotDate.includes('Wed') || e.nextSlotDate.includes('Thu') || e.nextSlotDate.includes('Fri'));
   }
@@ -50,7 +50,7 @@ export const ExpertsScreen: React.FC<ExpertsScreenProps> = ({
   }
 
   return (
-    <main className="flex flex-col relative w-full pt-16 pb-24 bg-[#f8f9ff] flex-1 min-h-screen max-w-lg mx-auto">
+    <main className="flex flex-col relative w-full pt-4 pb-24 bg-[#f8f9ff] flex-1 min-h-screen max-w-6xl mx-auto">
       <div className="flex flex-col w-full">
         {/* Query & Context Banner */}
         <div className="px-4 pt-4 pb-2 flex flex-col gap-3">
@@ -123,7 +123,7 @@ export const ExpertsScreen: React.FC<ExpertsScreenProps> = ({
 
           {/* Quick filter chips horizontal scroll */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-4 px-4 no-scrollbar">
-            {['All Domains', 'MIT / Harvard', 'Virtual 1:1', 'Under $120/hr', 'Available This Week'].map((f) => {
+            {['All Domains', 'MIT / Harvard', 'Virtual 1:1', 'Under ₦15,000', 'Available This Week'].map((f) => {
               const isSelected = activeDomainFilter === f;
               return (
                 <button
@@ -144,8 +144,8 @@ export const ExpertsScreen: React.FC<ExpertsScreenProps> = ({
           </div>
         </div>
 
-        {/* Expert Cards Feed */}
-        <div className="px-4 flex flex-col gap-4 py-2">
+        {/* Expert Cards Feed in Multi-Column Grid */}
+        <div className="px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-2">
           {filtered.map((mentor) => {
             const isBookmarked = bookmarkedIds.includes(mentor.id);
             return (
@@ -263,7 +263,7 @@ export const ExpertsScreen: React.FC<ExpertsScreenProps> = ({
                       <span className="text-[#43474d] text-[12px]">{mentor.nextSlotText}</span>
                     </div>
                     <span className="text-[#0b1c30] font-bold text-[16px]">
-                      ${mentor.hourlyRate}
+                      {formatNaira(mentor.hourlyRate)}
                       <span className="text-[11px] font-normal text-[#43474d]">/45m</span>
                     </span>
                   </div>

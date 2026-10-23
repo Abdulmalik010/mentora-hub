@@ -1,0 +1,6 @@
+{
+  "name": "Mentora - Academic Learning & Expert Mentorship Hub",
+  "description": "Connect with leading professors, research advisors, and industry scholars. Engage in AI-assisted consultations, schedule 1:1 mentorship sessions, and advance your academic and professional frontier.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

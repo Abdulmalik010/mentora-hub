@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #f8f9ff;
+  --color-surface-dim: #cbdbf5;
+  --color-surface-bright: #f8f9ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e5eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d3e4fe;
+  --color-on-surface: #0b1c30;
+  --color-on-surface-variant: #43474d;
+  --color-inverse-surface: #213145;
+  --color-inverse-on-surface: #eaf1ff;
+  --color-outline: #74777e;
+  --color-outline-variant: #c3c6ce;
+  --color-surface-tint: #49607c;
+  --color-primary: #001428;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #0f2942;
+  --color-on-primary-container: #7991af;
+  --color-inverse-primary: #b0c9e8;
+  --color-secondary: #a73a00;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #fd651e;
+  --color-on-secondary-container: #571a00;
+  --color-tertiary: #001232;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #002659;
+  --color-on-tertiary-container: #498cff;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-primary-fixed: #d1e4ff;
+  --color-primary-fixed-dim: #b0c9e8;
+  --color-on-primary-fixed: #011d35;
+  --color-on-primary-fixed-variant: #314863;
+  --color-secondary-fixed: #ffdbce;
+  --color-secondary-fixed-dim: #ffb599;
+  --color-on-secondary-fixed: #370e00;
+  --color-on-secondary-fixed-variant: #7f2b00;
+  --color-tertiary-fixed: #d8e2ff;
+  --color-tertiary-fixed-dim: #adc6ff;
+  --color-on-tertiary-fixed: #001a42;
+  --color-on-tertiary-fixed-variant: #004395;
+  --color-background: #f8f9ff;
+  --color-on-background: #0b1c30;
+  --color-surface-variant: #d3e4fe;
+}
+
+@layer base {
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #f8f9ff;
+    color: #0b1c30;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,33 @@
+"""Environment-only configuration.
+
+Every setting reads from the environment (optionally via a local ``.env``
+file); nothing secret is hardcoded. See ``.env.example``.
+"""
+from __future__ import annotations
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+class Config:
+    """Base Flask configuration."""
+
+    SECRET_KEY: str = os.environ.get("SECRET_KEY", "dev-only-insecure-change-me")
+    SQLALCHEMY_DATABASE_URI: str = os.environ.get(
+        "SQLALCHEMY_DATABASE_URI", "sqlite:///mentora.db"
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
+
+    META_API_KEY: str | None = os.environ.get("META_API_KEY")
+    META_BASE_URL: str | None = os.environ.get("META_BASE_URL")
+    META_MODEL_AGENT: str | None = os.environ.get("META_MODEL_AGENT")
+    META_MODEL_FAST: str | None = os.environ.get("META_MODEL_FAST")
+    META_MODEL_TRANSCRIBE: str | None = os.environ.get("META_MODEL_TRANSCRIBE")
+
+    EMAIL_PROVIDER: str | None = os.environ.get("EMAIL_PROVIDER")
+    EMAIL_API_KEY: str | None = os.environ.get("EMAIL_API_KEY")
+    EMAIL_FROM: str | None = os.environ.get("EMAIL_FROM")
+    EMAIL_FROM_NAME: str | None = os.environ.get("EMAIL_FROM_NAME", "Mentora")

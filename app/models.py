@@ -202,6 +202,27 @@ class RunEvent(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
+class MatchResult(db.Model):
+    """One ranked professor recommendation for a case (rank 1..3)."""
+
+    __tablename__ = "match_results"
+
+    id = db.Column(db.Integer, primary_key=True)
+    case_id = db.Column(
+        db.Integer, db.ForeignKey("case_files.id"), nullable=False, index=True
+    )
+    professor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    rank = db.Column(db.Integer, nullable=False)
+    score = db.Column(db.Integer, nullable=False)
+    reasons = db.Column(db.JSON, nullable=False, default=list)
+    caveats = db.Column(db.JSON, nullable=False, default=list)
+    next_slot = db.Column(db.String(200), nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+    case = db.relationship("CaseFile", foreign_keys=[case_id])
+    professor = db.relationship("User", foreign_keys=[professor_id])
+
+
 class ToolCallLog(db.Model):
     """Audit row for every agent tool call (see ``run_tool_loop``)."""
 

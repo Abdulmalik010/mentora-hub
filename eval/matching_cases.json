@@ -1,0 +1,1292 @@
+[
+  {
+    "id": "spec-01",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on Bayesian methods and clinical trial design.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Bayesian inference.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Bayesian inference.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Bayesian inference",
+        "Clinical trials"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      1
+    ]
+  },
+  {
+    "id": "spec-02",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on survey design and official statistics.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Survey sampling.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Survey sampling.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Survey sampling",
+        "Official statistics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      2
+    ]
+  },
+  {
+    "id": "spec-03",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on time series modelling and forecasting.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Time series.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Time series.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Time series",
+        "Forecasting"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      3
+    ]
+  },
+  {
+    "id": "spec-04",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on experiments and causal inference.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Experimental design.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Experimental design.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Experimental design",
+        "Causal inference"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      4
+    ]
+  },
+  {
+    "id": "spec-05",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on multivariate methods and psychometrics.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Multivariate analysis.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Multivariate analysis.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Multivariate analysis",
+        "Psychometrics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      5
+    ]
+  },
+  {
+    "id": "spec-06",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on machine learning and language models.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Machine learning.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Machine learning.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Machine learning",
+        "Natural language processing"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      6
+    ]
+  },
+  {
+    "id": "spec-07",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on databases and data pipelines.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Databases.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Databases.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Databases",
+        "Data engineering"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      7
+    ]
+  },
+  {
+    "id": "spec-08",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on algorithms and optimization.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Algorithms.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Algorithms.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Algorithms",
+        "Optimization"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      8
+    ]
+  },
+  {
+    "id": "spec-09",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on software design and programming languages.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Software engineering.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Software engineering.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Software engineering",
+        "Programming languages"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      9
+    ]
+  },
+  {
+    "id": "spec-10",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on computer vision and image analysis.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Computer vision.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Computer vision.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Computer vision",
+        "Image analysis"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      10
+    ]
+  },
+  {
+    "id": "spec-11",
+    "diagnosis": {
+      "field": "Economics",
+      "level": "masters",
+      "core_problem": "Advises on development and poverty measurement.",
+      "gaps": [
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Development economics.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Development economics.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Development economics",
+        "Poverty measurement"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      11
+    ]
+  },
+  {
+    "id": "spec-12",
+    "diagnosis": {
+      "field": "Economics",
+      "level": "masters",
+      "core_problem": "Advises on econometrics and policy evaluation.",
+      "gaps": [
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Econometrics.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Econometrics.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Econometrics",
+        "Policy evaluation"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      12
+    ]
+  },
+  {
+    "id": "spec-13",
+    "diagnosis": {
+      "field": "Economics",
+      "level": "masters",
+      "core_problem": "Advises on labour markets and education economics.",
+      "gaps": [
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Labour markets.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Labour markets.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Labour markets",
+        "Education economics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      13
+    ]
+  },
+  {
+    "id": "spec-14",
+    "diagnosis": {
+      "field": "Economics",
+      "level": "masters",
+      "core_problem": "Advises on monetary economics and financial markets.",
+      "gaps": [
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Monetary economics.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Monetary economics.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Monetary economics",
+        "Financial markets"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      14
+    ]
+  },
+  {
+    "id": "spec-15",
+    "diagnosis": {
+      "field": "Economics",
+      "level": "masters",
+      "core_problem": "Advises on behavioral and experimental economics.",
+      "gaps": [
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Behavioral economics.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Behavioral economics.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Behavioral economics",
+        "Experimental economics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      15
+    ]
+  },
+  {
+    "id": "spec-16",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on African literature and postcolonial theory.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing African literature.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing African literature.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "African literature",
+        "Postcolonial theory"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      16
+    ]
+  },
+  {
+    "id": "spec-17",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on academic writing and rhetoric.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Academic writing.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Academic writing.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Academic writing",
+        "Rhetoric"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      17
+    ]
+  },
+  {
+    "id": "spec-18",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on literary theory and narrative analysis.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Literary theory.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Literary theory.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Literary theory",
+        "Narratology"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      18
+    ]
+  },
+  {
+    "id": "spec-19",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on stylistics and discourse analysis.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Stylistics.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Stylistics.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Stylistics",
+        "Discourse analysis"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      19
+    ]
+  },
+  {
+    "id": "spec-20",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on comparative literature and translation.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Comparative literature.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Comparative literature.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Comparative literature",
+        "Translation studies"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      20
+    ]
+  },
+  {
+    "id": "mix-00",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on Bayesian methods and clinical trial design. Also: Advises on machine learning and language models.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Bayesian inference.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Bayesian inference.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Bayesian inference",
+        "Clinical trials",
+        "Machine learning",
+        "Natural language processing"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      1,
+      6
+    ]
+  },
+  {
+    "id": "mix-01",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on experiments and causal inference. Also: Advises on labour markets and education economics.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Experimental design.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Experimental design.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Experimental design",
+        "Causal inference",
+        "Labour markets",
+        "Education economics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      4,
+      13
+    ]
+  },
+  {
+    "id": "mix-02",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on databases and data pipelines. Also: Advises on comparative literature and translation.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Databases.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Databases.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Databases",
+        "Data engineering",
+        "Comparative literature",
+        "Translation studies"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      7,
+      20
+    ]
+  },
+  {
+    "id": "mix-03",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on computer vision and image analysis. Also: Advises on databases and data pipelines.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Computer vision.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Computer vision.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Computer vision",
+        "Image analysis",
+        "Databases",
+        "Data engineering"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      7,
+      10
+    ]
+  },
+  {
+    "id": "mix-04",
+    "diagnosis": {
+      "field": "Economics",
+      "level": "masters",
+      "core_problem": "Advises on labour markets and education economics. Also: Advises on monetary economics and financial markets.",
+      "gaps": [
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Labour markets.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Labour markets.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Labour markets",
+        "Education economics",
+        "Monetary economics",
+        "Financial markets"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      13,
+      14
+    ]
+  },
+  {
+    "id": "mix-05",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on African literature and postcolonial theory. Also: Advises on Bayesian methods and clinical trial design.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing African literature.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing African literature.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "African literature",
+        "Postcolonial theory",
+        "Bayesian inference",
+        "Clinical trials"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      1,
+      16
+    ]
+  },
+  {
+    "id": "mix-06",
+    "diagnosis": {
+      "field": "English Literature",
+      "level": "masters",
+      "core_problem": "Advises on stylistics and discourse analysis. Also: Advises on algorithms and optimization.",
+      "gaps": [
+        {
+          "category": "writing",
+          "description": "Synthetic writing gap needing Stylistics.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Stylistics.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Stylistics",
+        "Discourse analysis",
+        "Algorithms",
+        "Optimization"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      8,
+      19
+    ]
+  },
+  {
+    "id": "mix-07",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on survey design and official statistics. Also: Advises on behavioral and experimental economics.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Survey sampling.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "methodology",
+          "description": "Synthetic methodology gap needing Survey sampling.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Survey sampling",
+        "Official statistics",
+        "Behavioral economics",
+        "Experimental economics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      2,
+      15
+    ]
+  },
+  {
+    "id": "mix-08",
+    "diagnosis": {
+      "field": "Statistics",
+      "level": "masters",
+      "core_problem": "Advises on multivariate methods and psychometrics. Also: Advises on survey design and official statistics.",
+      "gaps": [
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Multivariate analysis.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "statistics",
+          "description": "Synthetic statistics gap needing Multivariate analysis.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Multivariate analysis",
+        "Psychometrics",
+        "Survey sampling",
+        "Official statistics"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      2,
+      5
+    ]
+  },
+  {
+    "id": "mix-09",
+    "diagnosis": {
+      "field": "Computer Science",
+      "level": "masters",
+      "core_problem": "Advises on algorithms and optimization. Also: Advises on software design and programming languages.",
+      "gaps": [
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Algorithms.",
+          "severity": 3,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 0"
+            }
+          ]
+        },
+        {
+          "category": "data",
+          "description": "Synthetic data gap needing Algorithms.",
+          "severity": 2,
+          "evidence": [
+            {
+              "page": 1,
+              "quote": "synthetic eval quote 1"
+            }
+          ]
+        }
+      ],
+      "what_student_already_tried": [],
+      "questions_for_professor": [],
+      "expertise_keywords": [
+        "Algorithms",
+        "Optimization",
+        "Software engineering",
+        "Programming languages"
+      ],
+      "confidence": 0.8
+    },
+    "acceptable_ids": [
+      8,
+      9
+    ]
+  }
+]

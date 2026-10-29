@@ -13,10 +13,11 @@ from flask import (
 from flask import Flask
 
 from ..extensions import db
-from ..models import CaseFile, Document, RunEvent
+from ..models import CaseFile, Document, ProfessorProfile, RunEvent, User
 from ..security import current_user, role_required
 from ..services.diagnosis import run_case_pipeline
 from ..services.extraction import ExtractionError, save_upload, validate_upload
+from ..services.matching import get_case_matches
 
 bp = Blueprint("cases", __name__)
 
@@ -131,7 +132,19 @@ def detail(case_id: int) -> str:
             .order_by(RunEvent.seq)
             .all()
         )
-    return render_template("cases/detail.html", case=case, events=events)
+    match_cards = []
+    for match in get_case_matches(case.id):
+        professor = db.session.get(User, match.professor_id)
+        profile = ProfessorProfile.query.filter_by(
+            user_id=match.professor_id
+        ).first()
+        if professor is not None and profile is not None:
+            match_cards.append(
+                {"match": match, "professor": professor, "profile": profile}
+            )
+    return render_template(
+        "cases/detail.html", case=case, events=events, match_cards=match_cards
+    )
 
 
 @bp.get("/cases/<int:case_id>/events")

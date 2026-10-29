@@ -316,8 +316,11 @@ def run_case_pipeline(
     chat_client: ChatClient | None = None,
     model: str | None = None,
     effort: str | None = None,
+    match_client: ChatClient | None = None,
+    match_model: str | None = None,
+    match_effort: str | None = None,
 ) -> None:
-    """Run intake for one case: extract, diagnose, ground, persist.
+    """Run intake for one case: extract, diagnose, ground, match, persist.
 
     Designed for a background thread; opens its own app context. Every step
     writes a real RunEvent. Failures mark the case ``error`` with a
@@ -339,10 +342,44 @@ def run_case_pipeline(
                 _run_parallel(app, case, run_id, chat_client, model, effort)
             else:
                 _run_pipeline(case, run_id, chat_client, model, effort)
+            _run_matching_phase(
+                case, run_id, match_client, match_model, match_effort
+            )
+            case.status = "done"
+            db.session.commit()
         except Exception as exc:
             case.status = "error"
             db.session.commit()
             log_event(run_id, "run_failed", f"Run failed: {exc}", status="error")
+
+
+def _run_matching_phase(
+    case: CaseFile,
+    run_id: str,
+    match_client: ChatClient | None,
+    match_model: str | None,
+    match_effort: str | None,
+) -> None:
+    """Match professors after diagnosis; needs an app context. Raises on failure."""
+    # Local import: matching.py depends on diagnosis helpers (one direction).
+    from .matching import MATCH_MAX_ATTEMPTS, MATCH_TIMEOUT_S, run_matching
+
+    if match_client is None or match_model is None:
+        settings = MetaSettings.from_env()
+        settings = replace(
+            settings, timeout_s=MATCH_TIMEOUT_S, max_attempts=MATCH_MAX_ATTEMPTS
+        )
+        match_client = match_client or OpenAICompatChatClient(settings)
+        match_model = match_model or settings.model_agent
+        if match_effort is None:
+            match_effort = settings.effort_agent
+    document = (
+        db.session.get(Document, case.document_id) if case.document_id else None
+    )
+    source = ""
+    if document is not None:
+        source = document.extracted_text or ""
+    run_matching(case, run_id, match_client, match_model, match_effort, source)
 
 
 @dataclass(frozen=True)
@@ -628,7 +665,6 @@ def _run_parallel(
     merged["failed_specialists"] = sorted(failed)
     case.diagnosis = merged
     case.grounding_rate = rate
-    case.status = "done"
     db.session.commit()
 
 
@@ -684,5 +720,4 @@ def _run_pipeline(
     )
     case.diagnosis = result.diagnosis
     case.grounding_rate = result.rate
-    case.status = "done"
     db.session.commit()

@@ -18,8 +18,9 @@ Built so far: Step 1 scaffold (factory, models, seed, Meta client, smoke
 tests), Step 2 session auth (register/login/logout, role guards) plus the base
 Jinja + Tailwind shell, Step 2b security close-out (seed demo logins, SECRET_KEY
 fail-fast, CSRF, hardened cookies) and a live Meta API check script, Step 3a
-student intake with document diagnosis and a live agent timeline. No matching,
-booking, email, recording, transcription, PDF notes or eval code exists yet.
+student intake with document diagnosis and a live agent timeline, Step 3b
+parallel specialists, evidence-based professor matching and live eval scripts.
+No booking, email, recording, transcription or PDF notes code exists yet.
 
 ## Stack
 
@@ -56,6 +57,9 @@ invalid input rejection, seeded users log in, NULL-hash rows blocked, login
 and role guards, tokenless POSTs rejected with CSRF on. Intake coverage:
 PDF/DOCX/TXT extraction, upload validation, grounding checker, owner-only
 access, CSRF on the intake form, background pipeline runs (fake client).
+Parallel coverage: specialist merge/rank, partial and total failure, merge
+failure, bad mode flag. Matching coverage: tool scoring, ranking validator,
+retry-once, budget degrade, tool-call logging, professors routes.
 
 ## Layout
 
@@ -66,23 +70,30 @@ app/
   extensions.py      shared extensions (db)
   models.py          User, ProfessorProfile, StudentProfile, Document,
                      CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
-                     ToolCallLog
+                     MatchResult, ToolCallLog
   security.py        current_user, login_required, role_required
   blueprints/        auth (register/login/logout), cases (dashboard, intake,
-                     detail, events), professors, bookings, agent (health only)
+                     detail, events), professors (public directory),
+                     bookings, agent (health only)
   templates/         base shell + design macros (_ui.html) + auth/case pages
   services/
     meta_client.py   Meta API: retries, structured output, run_tool_loop
     extraction.py    upload validation, storage, text extraction
-    diagnosis.py     diagnosis prompt, grounding check, intake pipeline
+    diagnosis.py     parallel/single diagnosis, grounding, intake pipeline
+    matching.py      professor tools, ranking, validation, match runner
     email_service.py stub (provider TBD)
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
-scripts/seed.py      idempotent synthetic seed (12 profs / 4 depts / 3 students)
+scripts/seed.py      idempotent synthetic seed (20 profs / 4 depts / 3 students)
 scripts/check_meta.py live Meta API smoke test (never run by pytest)
 scripts/make_samples.py regenerates samples/ fixtures
+scripts/make_matching_cases.py regenerates eval/matching_cases.json
+scripts/eval_diagnosis.py live diagnosis eval (never run by pytest)
+scripts/eval_matching.py live matching eval (never run by pytest)
 samples/             synthetic thesis excerpts + expected.json (demo fixtures)
-tests/               pytest suite (smoke + auth + intake)
+eval/                30 generated matching-eval cases
+docs/eval/           eval reports (written by the eval scripts)
+tests/               pytest suite (smoke + auth + intake + parallel + matching)
 ```
 
 ## Live API check
@@ -101,7 +112,25 @@ Log in as a seeded student (any `sample-student-0X@example.com` address with
 `SEED_DEMO_PASSWORD`), open Dashboard, and submit a new request with
 `samples/thesis_excerpt_stats.pdf` attached. The case page shows the agent
 timeline on the right as each real step completes, then the diagnosis with
-grounded evidence quotes on the left.
+grounded evidence quotes plus three recommended professors on the left.
+
+## Evaluation
+
+Live scripts (real Meta calls, real credit; never run by pytest):
+
+```powershell
+python -m scripts.eval_diagnosis [--mode both|parallel|single] [--reps 3]
+python -m scripts.eval_matching [--limit N]
+python -m scripts.make_matching_cases   # regenerate eval/matching_cases.json
+```
+
+`eval_diagnosis` compares found gaps with `samples/expected.json` over
+repeated runs (planted-flaw recall, grounding rate, latency, tokens) and
+writes `docs/eval/diagnosis.md`. `eval_matching` runs the 30 generated cases
+(top-1/top-3 accuracy, latency, tokens) and writes `docs/eval/matching.md`.
+Both need `META_API_KEY` plus the `META_MODEL_*` ids in `.env`;
+`eval_matching` also needs `SEED_DEMO_PASSWORD`. Start matching with
+`--limit 3`: a full run is 30 Wonder calls.
 
 ## Design credits
 

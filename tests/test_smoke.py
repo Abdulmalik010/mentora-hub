@@ -14,6 +14,7 @@ from app.models import ProfessorProfile, StudentProfile, ToolCallLog, User
 from app.services.meta_client import (
     ChatResult,
     MetaClientError,
+    ToolBudgetExceeded,
     ToolCallRecord,
     ToolCallRequest,
     run_tool_loop,
@@ -43,6 +44,7 @@ def test_models_import_and_tables_exist(app: Flask) -> None:
         "case_files",
         "bookings",
         "session_records",
+        "match_results",
         "memory_notes",
         "run_events",
         "tool_call_logs",
@@ -50,13 +52,13 @@ def test_models_import_and_tables_exist(app: Flask) -> None:
     assert User.query.count() == 0
 
 
-def test_seed_yields_12_professors_and_3_students(app: Flask) -> None:
-    """Seed produces 12 professors across 4 departments and 3 students."""
+def test_seed_yields_20_professors_and_3_students(app: Flask) -> None:
+    """Seed produces 20 professors across 4 departments and 3 students."""
     counts = seed_database()
-    assert counts == {"professors": 12, "students": 3}
-    assert User.query.filter_by(role="professor").count() == 12
+    assert counts == {"professors": 20, "students": 3}
+    assert User.query.filter_by(role="professor").count() == 20
     assert User.query.filter_by(role="student").count() == 3
-    assert ProfessorProfile.query.count() == 12
+    assert ProfessorProfile.query.count() == 20
     assert StudentProfile.query.count() == 3
     departments = {
         row[0] for row in db.session.query(ProfessorProfile.department).distinct()
@@ -74,8 +76,8 @@ def test_seed_is_idempotent(app: Flask) -> None:
     """A second seed run creates nothing new."""
     first = seed_database()
     second = seed_database()
-    assert first == second == {"professors": 12, "students": 3}
-    assert ProfessorProfile.query.count() == 12
+    assert first == second == {"professors": 20, "students": 3}
+    assert ProfessorProfile.query.count() == 20
 
 
 class FakeChatClient:
@@ -197,4 +199,34 @@ def test_tool_loop_enforces_max_iterations() -> None:
             model="fake-model",
             log_tool_call=lambda record: None,
             max_iterations=3,
+        )
+
+
+def test_tool_loop_enforces_max_tool_calls() -> None:
+    """Batched calls cannot dodge the volume cap; breach is a BudgetExceeded."""
+
+    class StubbornFake(FakeChatClient):
+        def chat(self, messages, tools=None, **kwargs):  # type: ignore[no-untyped-def]
+            self.calls += 1
+            return ChatResult(
+                text="",
+                tool_calls=(
+                    ToolCallRequest(
+                        id=f"call_{self.calls}", name="noop", arguments={}
+                    ),
+                ),
+                raw_assistant_message={"role": "assistant", "content": ""},
+            )
+
+    assert issubclass(ToolBudgetExceeded, MetaClientError)
+    with pytest.raises(ToolBudgetExceeded, match="max_tool_calls"):
+        run_tool_loop(
+            StubbornFake([]),
+            [{"role": "user", "content": "hi"}],
+            tools=[],
+            execute_tool={"noop": lambda args: "ok"},
+            model="fake-model",
+            log_tool_call=lambda record: None,
+            max_iterations=100,
+            max_tool_calls=2,
         )

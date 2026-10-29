@@ -48,6 +48,10 @@ class MetaClientError(RuntimeError):
     """Meta API configuration, request or tool-loop failure."""
 
 
+class ToolBudgetExceeded(MetaClientError):
+    """Tool loop breached its iteration or total-call budget."""
+
+
 def _clean_api_key(raw: str | None, source: str) -> str:
     """Validate a key; fail clearly on embedded whitespace or newlines."""
     if raw is None or not raw.strip():
@@ -331,18 +335,23 @@ def run_tool_loop(
     model: str,
     log_tool_call: Callable[[ToolCallRecord], None] | None = None,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
+    max_tool_calls: int | None = None,
     run_id: str | None = None,
     effort: str | None = None,
 ) -> str:
-    """Run a model/tools loop until a final answer or ``max_iterations``.
+    """Run a model/tools loop until a final answer or a budget breach.
 
     Every tool call is logged via ``log_tool_call`` (default: ToolCallLog
     rows). Unknown tools and tool exceptions become error results for the
     model and are logged with ``status="error"`` instead of aborting.
+    Breaching ``max_iterations`` or ``max_tool_calls`` raises
+    ToolBudgetExceeded (iterations bound turns; models can batch many
+    calls per turn, so volume needs its own cap).
     """
     logger = log_tool_call or log_tool_call_to_db
     active_run_id = run_id or uuid.uuid4().hex
     working = list(messages)
+    total_calls = 0
     for _ in range(max_iterations):
         result = client.chat(working, tools, model=model, effort=effort)
         if not result.tool_calls:
@@ -352,6 +361,11 @@ def run_tool_loop(
             or {"role": "assistant", "content": result.text}
         )
         for call in result.tool_calls:
+            total_calls += 1
+            if max_tool_calls is not None and total_calls > max_tool_calls:
+                raise ToolBudgetExceeded(
+                    f"tool loop exceeded max_tool_calls={max_tool_calls}"
+                )
             started = time.monotonic()
             func = execute_tool.get(call.name)
             if func is None:
@@ -385,7 +399,7 @@ def run_tool_loop(
             working.append(
                 {"role": "tool", "tool_call_id": call.id, "content": content}
             )
-    raise MetaClientError(f"tool loop exceeded max_iterations={max_iterations}")
+    raise ToolBudgetExceeded(f"tool loop exceeded max_iterations={max_iterations}")
 
 
 class MetaClient:
@@ -447,6 +461,7 @@ class MetaClient:
         model: str | None = None,
         log_tool_call: Callable[[ToolCallRecord], None] | None = None,
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
+        max_tool_calls: int | None = None,
         run_id: str | None = None,
         effort: str | None = None,
     ) -> str:
@@ -459,6 +474,7 @@ class MetaClient:
             model=model or self.settings.model_agent,
             log_tool_call=log_tool_call,
             max_iterations=max_iterations,
+            max_tool_calls=max_tool_calls,
             run_id=run_id,
             effort=effort if effort is not None else self.settings.effort_agent,
         )

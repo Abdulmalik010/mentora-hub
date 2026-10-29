@@ -18,6 +18,7 @@
           <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
           <a href="{{ url_for('cases.new_form') }}" class="font-medium text-muted hover:text-ink">New request</a>
         {% endif %}
+        <a href="{{ url_for('professors.index') }}" class="font-medium text-muted hover:text-ink">Professors</a>
         <details class="user-menu relative">
           <summary class="flex items-center gap-2 rounded-lg px-1 py-1" aria-label="Account menu">
             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-semibold text-white" aria-hidden="true">{{ current_user.display_name[0]|upper }}</span>
@@ -32,6 +33,7 @@
           </div>
         </details>
       {% else %}
+        <a href="{{ url_for('professors.index') }}" class="font-medium text-muted hover:text-ink">Professors</a>
         <a href="{{ url_for('auth.login') }}" class="font-medium text-muted hover:text-ink">Log in</a>
         <a href="{{ url_for('auth.register') }}" class="rounded-lg bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-hover">Register</a>
       {% endif %}
@@ -47,11 +49,13 @@
           <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
           <a href="{{ url_for('cases.new_form') }}" class="py-1">New request</a>
         {% endif %}
+        <a href="{{ url_for('professors.index') }}" class="py-1">Professors</a>
         <form method="post" action="{{ url_for('auth.logout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="py-1 text-left">Log out ({{ current_user.display_name }})</button>
         </form>
       {% else %}
+        <a href="{{ url_for('professors.index') }}" class="py-1">Professors</a>
         <a href="{{ url_for('auth.login') }}" class="py-1">Log in</a>
         <a href="{{ url_for('auth.register') }}" class="py-1">Register</a>
       {% endif %}

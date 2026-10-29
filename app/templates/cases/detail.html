@@ -7,7 +7,8 @@
 {% set types = events | map(attribute="type") | list %}
 {% set ns = namespace(step=1) %}
 {% if "text_extracted" in types or "native_pdf_fallback" in types %}{% set ns.step = 3 %}{% elif types %}{% set ns.step = 2 %}{% endif %}
-{% if "diagnosis_finished" in types %}{% set ns.step = 4 %}{% elif "diagnosis_started" in types %}{% set ns.step = 3 %}{% endif %}
+{% if "diagnosis_finished" in types or "merge_finished" in types %}{% set ns.step = 4 %}{% elif "diagnosis_started" in types %}{% set ns.step = 3 %}{% endif %}
+{% if "matching_finished" in types %}{% set ns.step = 5 %}{% elif "matching_started" in types %}{% set ns.step = 4 %}{% endif %}
 <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
   <div class="min-w-0">
     <p class="text-sm font-semibold text-brand"><a href="{{ url_for('cases.dashboard') }}" class="hover:text-brand-hover">← All cases</a></p>
@@ -17,8 +18,8 @@
   <div class="shrink-0 pt-1">{{ badge(case.status, tone=tone) }}</div>
 </div>
 
-<ol class="mb-8 grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Case progress">
-  {% for label in ["Received", "Reading document", "Diagnosing", "Verified"] %}
+<ol class="mb-8 grid grid-cols-2 gap-2 md:grid-cols-5" aria-label="Case progress">
+  {% for label in ["Received", "Reading document", "Diagnosing", "Verified", "Matched"] %}
     {% set i = loop.index %}
     <li class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm
         {% if case.status == 'error' and i == ns.step %}border-danger/30 bg-danger/10
@@ -40,7 +41,7 @@
   <div class="lg:col-span-3">
     <h2 class="mb-4 font-display text-xl font-semibold tracking-tight">Diagnosis</h2>
     <div id="provisional-gaps" class="mb-4 hidden space-y-4" aria-live="polite" aria-label="Gaps found so far"></div>
-    {% if case.status == "done" and case.diagnosis %}
+    {% if case.diagnosis %}
       {% set d = case.diagnosis %}
       <div class="space-y-4">
         {% call card("Summary") %}
@@ -55,6 +56,7 @@
           <p class="mt-3 text-sm leading-relaxed">{{ d.get("core_problem", "") }}</p>
         {% endcall %}
         {% for gap in d.get("gaps", []) %}
+          <div id="gap-g{{ loop.index }}" class="scroll-mt-24">
           {% call card() %}
             <div class="flex flex-wrap items-center justify-between gap-2">
               {{ badge(gap.get("category", "other"), tone="brand") }}
@@ -77,6 +79,7 @@
               </div>
             {% endif %}
           {% endcall %}
+          </div>
         {% endfor %}
         {% if d.get("what_student_already_tried") %}
           {% call card("Already tried") %}
@@ -104,6 +107,69 @@
           </div>
         {% endif %}
       </div>
+      {% if match_cards %}
+        <h2 class="mb-4 mt-10 font-display text-xl font-semibold tracking-tight">Recommended professors</h2>
+        <div class="space-y-4">
+          {% for card in match_cards %}
+            {% set m = card.match %}{% set prof = card.professor %}{% set p = card.profile %}
+            {% set parts = prof.display_name.split() %}
+            {% set initials = ((parts[0][0] if parts|length > 0 else "?") + (parts[1][0] if parts|length > 1 else ""))|upper %}
+            {% set off = 100.53 * (1 - m.score / 100) %}
+            <section class="rounded-2xl border border-border bg-card px-6 py-5 shadow-sm" aria-label="Match {{ loop.index }}: {{ prof.display_name }}">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-3">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand font-semibold text-white" aria-hidden="true">{{ initials }}</span>
+                  <div class="min-w-0">
+                    <a href="{{ url_for('professors.detail', user_id=prof.id) }}" class="font-display text-lg font-semibold hover:text-brand">{{ prof.display_name }}</a>
+                    <p class="text-sm text-muted">{{ p.department }}</p>
+                  </div>
+                </div>
+                <svg width="56" height="56" viewBox="0 0 40 40" role="img" aria-label="Match score {{ m.score }} out of 100" class="shrink-0">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#E7E2D9" stroke-width="5"/>
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#0E6B5C" stroke-width="5" stroke-linecap="round"
+                      stroke-dasharray="100.53" stroke-dashoffset="{{ off }}" transform="rotate(-90 20 20)"/>
+                  <text x="20" y="24" text-anchor="middle" font-size="11" font-weight="700" fill="#0B1B33">{{ m.score }}</text>
+                </svg>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-1.5">
+                {% for area in p.research_areas %}
+                  {{ badge(area) }}
+                {% endfor %}
+              </div>
+              <h3 class="mt-4 text-sm font-semibold">Why this match</h3>
+              <ul class="mt-2 space-y-2">
+                {% for reason in m.reasons %}
+                  <li class="text-sm">
+                    <span>{{ reason.explanation }}</span>
+                    <span class="ml-1 inline-flex gap-1">
+                      <a href="#gap-{{ reason.gap_id }}" class="rounded-full border border-brand/30 bg-brand-tint px-2 py-0.5 text-xs font-semibold text-brand hover:text-brand-hover">{{ reason.gap_id }}</a>
+                      {{ badge("page " ~ reason.page) }}
+                    </span>
+                  </li>
+                {% endfor %}
+              </ul>
+              {% if m.caveats %}
+                <ul class="mt-2 space-y-1">
+                  {% for caveat in m.caveats %}
+                    <li class="text-xs text-muted">Note: {{ caveat }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm">
+                <p class="text-muted">Next open slot: <strong class="font-semibold text-ink">{{ m.next_slot or "on request" }}</strong>
+                  {% if p.rate is not none %}<span title="Demo units; currency is decided at the booking step.">· {{ p.rate|int }}/session</span>{% endif %}
+                </p>
+                <button type="button" disabled title="Booking opens in the next step"
+                    class="cursor-not-allowed rounded-lg border border-border bg-paper px-4 py-2 text-sm font-semibold text-muted">
+                  Book session: coming next
+                </button>
+              </div>
+            </section>
+          {% endfor %}
+        </div>
+      {% elif case.status == "error" %}
+        <p class="mt-8 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm">Professor matching did not complete for this case.</p>
+      {% endif %}
     {% elif case.status == "error" %}
       {{ empty_state("Diagnosis failed", "The run hit an error. The timeline shows how far it got before stopping.", icon_name="alert") }}
     {% else %}

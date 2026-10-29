@@ -1,4 +1,4 @@
-"""Idempotent development seed: synthetic professors and students.
+"""Idempotent development seed: 20 synthetic professors, 3 students.
 
 Run from the project root: ``python -m scripts.seed`` (requires the
 ``SEED_DEMO_PASSWORD`` env var). Creates tables when missing. Every record
@@ -30,32 +30,51 @@ DEPARTMENTS: tuple[str, ...] = (
     "English Literature",
 )
 
-RESEARCH_AREAS: dict[str, list[str]] = {
-    "Statistics": [
-        "Bayesian inference",
-        "Survey sampling",
-        "Regression modelling",
-        "Experimental design",
-    ],
-    "Computer Science": [
-        "Machine learning",
-        "Databases",
-        "Algorithms",
-        "Software engineering",
-    ],
-    "Economics": [
-        "Development economics",
-        "Econometrics",
-        "Labour markets",
-        "Public policy",
-    ],
-    "English Literature": [
-        "African literature",
-        "Academic writing",
-        "Literary theory",
-        "Stylistics",
-    ],
-}
+# Importable spec: (department, research areas, specialty blurb). Order is the
+# deterministic seed order, so a fresh database assigns professor ids 1..20;
+# scripts/make_matching_cases.py derives eval expectations from this table.
+PROFESSOR_SPECS: tuple[tuple[str, list[str], str], ...] = (
+    ("Statistics", ["Bayesian inference", "Clinical trials"],
+     "Advises on Bayesian methods and clinical trial design."),
+    ("Statistics", ["Survey sampling", "Official statistics"],
+     "Advises on survey design and official statistics."),
+    ("Statistics", ["Time series", "Forecasting"],
+     "Advises on time series modelling and forecasting."),
+    ("Statistics", ["Experimental design", "Causal inference"],
+     "Advises on experiments and causal inference."),
+    ("Statistics", ["Multivariate analysis", "Psychometrics"],
+     "Advises on multivariate methods and psychometrics."),
+    ("Computer Science", ["Machine learning", "Natural language processing"],
+     "Advises on machine learning and language models."),
+    ("Computer Science", ["Databases", "Data engineering"],
+     "Advises on databases and data pipelines."),
+    ("Computer Science", ["Algorithms", "Optimization"],
+     "Advises on algorithms and optimization."),
+    ("Computer Science", ["Software engineering", "Programming languages"],
+     "Advises on software design and programming languages."),
+    ("Computer Science", ["Computer vision", "Image analysis"],
+     "Advises on computer vision and image analysis."),
+    ("Economics", ["Development economics", "Poverty measurement"],
+     "Advises on development and poverty measurement."),
+    ("Economics", ["Econometrics", "Policy evaluation"],
+     "Advises on econometrics and policy evaluation."),
+    ("Economics", ["Labour markets", "Education economics"],
+     "Advises on labour markets and education economics."),
+    ("Economics", ["Monetary economics", "Financial markets"],
+     "Advises on monetary economics and financial markets."),
+    ("Economics", ["Behavioral economics", "Experimental economics"],
+     "Advises on behavioral and experimental economics."),
+    ("English Literature", ["African literature", "Postcolonial theory"],
+     "Advises on African literature and postcolonial theory."),
+    ("English Literature", ["Academic writing", "Rhetoric"],
+     "Advises on academic writing and rhetoric."),
+    ("English Literature", ["Literary theory", "Narratology"],
+     "Advises on literary theory and narrative analysis."),
+    ("English Literature", ["Stylistics", "Discourse analysis"],
+     "Advises on stylistics and discourse analysis."),
+    ("English Literature", ["Comparative literature", "Translation studies"],
+     "Advises on comparative literature and translation."),
+)
 
 STUDENT_LEVELS: tuple[str, ...] = ("undergraduate", "masters", "phd")
 STUDENT_FIELDS: tuple[str, ...] = ("Statistics", "Computer Science", "Economics")
@@ -85,9 +104,7 @@ def seed_database() -> dict[str, int]:
     otherwise no-ops.
     """
     password = _demo_password()
-    for i in range(1, 13):
-        dept = DEPARTMENTS[(i - 1) // 3]
-        areas = RESEARCH_AREAS[dept]
+    for i, (dept, areas, blurb) in enumerate(PROFESSOR_SPECS, 1):
         user, _ = _get_or_create_user(
             f"sample-professor-{i:02d}@example.com",
             display_name=f"Sample Professor {i:02d}",
@@ -96,22 +113,23 @@ def seed_database() -> dict[str, int]:
         )
         if user.password_hash is None:
             user.set_password(password)
+        profile_fields = {
+            "department": dept,
+            "research_areas": list(areas),
+            "bio": f"{SAMPLE_BIO} {blurb}",
+            "rate": 10000.0 + i * 1000.0,
+            "timezone": "Africa/Lagos",
+            "availability": {
+                "days": ["Monday", "Wednesday", "Friday"][0 : (i % 3) + 1],
+                "hours": "10:00-14:00 WAT",
+            },
+        }
         if user.professor_profile is None:
-            pick = ((i - 1) % 3, (i % 4))
-            db.session.add(
-                ProfessorProfile(
-                    user_id=user.id,
-                    department=dept,
-                    research_areas=[areas[pick[0]], areas[pick[1]]],
-                    bio=f"{SAMPLE_BIO} Advises on {dept.lower()} coursework and theses.",
-                    rate=10000.0 + i * 2500.0,
-                    timezone="Africa/Lagos",
-                    availability={
-                        "days": ["Monday", "Wednesday", "Friday"][0 : (i % 3) + 1],
-                        "hours": "10:00-14:00 WAT",
-                    },
-                )
-            )
+            db.session.add(ProfessorProfile(user_id=user.id, **profile_fields))
+        elif user.is_sample:
+            # Seed owns sample rows: refresh stale specs, still convergent.
+            for key, value in profile_fields.items():
+                setattr(user.professor_profile, key, value)
 
     for i, (level, field) in enumerate(zip(STUDENT_LEVELS, STUDENT_FIELDS), 1):
         user, _ = _get_or_create_user(

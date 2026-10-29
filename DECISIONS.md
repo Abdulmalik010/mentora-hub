@@ -42,3 +42,10 @@
 - 2026-10-29: Case stepper stages derive from real RunEvents and toasts render server-side (no-JS safe); error pages share the macro set.
 - 2026-10-29: Parallel diagnosis: 3 concurrent Spark specialists (FAST model) plus a Spark merge; live probe 13.4s wall (specialists 5.5/6.1/6.3s, merge 7.0s, ~7.4k tokens) vs 78s single Wonder call.
 - 2026-10-29: Specialist or merge failure degrades (flagged partial result), it never kills the run unless all specialists fail; event seq guarded by a thread lock; SQLite WAL plus 5s busy timeout.
+- 2026-10-29: Seed holds 20 professors from an importable PROFESSOR_SPECS table (deterministic fresh-db ids 1-20); seed refreshes stale sample profiles, still convergent.
+- 2026-10-29: MatchResult stores one row per ranked match (rank, score, reasons, caveats, next_slot).
+- 2026-10-29: Matching is a Wonder tool loop (6 iterations, 12 calls, 180s timeout, 5 attempts) plus a structured ranking validated in code (ids exist, 3 matches) with one retry.
+- 2026-10-29: Tool budgets raise ToolBudgetExceeded; matching degrades to ranking-from-findings instead of failing (live: a 26-call sweep is now capped; converged run used 9 calls).
+- 2026-10-29: Ranking prompt carries the tool findings transcript, not just the loop summary.
+- 2026-10-29: Professors directory and profiles are public; case routes stay student-only.
+- 2026-10-29: Evals are live scripts (never pytest): eval_diagnosis measures recall/grounding/latency parallel-vs-single; eval_matching scores top-1/top-3 over 30 generated cases; reports go to docs/eval/.

@@ -1,6 +1,9 @@
 """Live Meta Model API smoke test (real calls, real credits; never run by pytest).
 
-Usage: ``python -m scripts.check_meta [--audio path/to/file.wav]``
+Usage: ``python -m scripts.check_meta [--audio path/to/file.wav] [--effort EF]``
+
+``--effort`` sets reasoning effort for the chat checks: default (omit the
+parameter), minimal, low, medium or high.
 
 Verifies, with one minimal call each:
   (a) META_MODEL_AGENT: a tool-call round trip with a trivial local tool.
@@ -70,10 +73,12 @@ class _RecordingClient:
         *,
         model: str,
         response_format: dict[str, Any] | None = None,
+        effort: str | None = None,
     ) -> ChatResult:
         """Delegate the call and record the normalized result."""
         result = self._inner.chat(
-            messages, tools, model=model, response_format=response_format
+            messages, tools, model=model, response_format=response_format,
+            effort=effort,
         )
         self.results.append(result)
         return result
@@ -91,7 +96,9 @@ def _usage_line(results: Sequence[ChatResult]) -> str:
     return f"usage=in:{prompt} out:{completion} total:{prompt + completion}"
 
 
-def _check_tool_roundtrip(client: ChatClient, model: str) -> CheckOutcome:
+def _check_tool_roundtrip(
+    client: ChatClient, model: str, effort: str | None
+) -> CheckOutcome:
     """One tool call (add 214 + 186) through run_tool_loop; expect 400."""
     outcome = CheckOutcome(name="(a) agent tool round trip", passed=False)
     if not model:
@@ -127,6 +134,7 @@ def _check_tool_roundtrip(client: ChatClient, model: str) -> CheckOutcome:
             model=model,
             log_tool_call=records.append,
             max_iterations=4,
+            effort=effort,
         )
     except Exception as exc:
         outcome.detail.append(f"{type(exc).__name__}: {exc}")
@@ -145,7 +153,9 @@ def _check_tool_roundtrip(client: ChatClient, model: str) -> CheckOutcome:
     return outcome
 
 
-def _check_structured_json(client: ChatClient, model: str) -> CheckOutcome:
+def _check_structured_json(
+    client: ChatClient, model: str, effort: str | None
+) -> CheckOutcome:
     """One schema-conforming JSON call on the fast model."""
     outcome = CheckOutcome(name="(b) fast structured JSON", passed=False)
     if not model:
@@ -159,6 +169,7 @@ def _check_structured_json(client: ChatClient, model: str) -> CheckOutcome:
             [{"role": "user", "content": "My regression residuals fan out. Reply per schema."}],
             model=model,
             name="GapHint",
+            effort=effort,
             schema={
                 "type": "object",
                 "properties": {
@@ -211,7 +222,9 @@ def _synthetic_pdf_bytes(text: str) -> bytes:
     return bytes(out)
 
 
-def _check_pdf_input(client: ChatClient, model: str) -> CheckOutcome:
+def _check_pdf_input(
+    client: ChatClient, model: str, effort: str | None
+) -> CheckOutcome:
     """Native PDF file block vs extracted text on the agent model."""
     outcome = CheckOutcome(name="(c) agent PDF input", passed=False)
     if not model:
@@ -239,6 +252,7 @@ def _check_pdf_input(client: ChatClient, model: str) -> CheckOutcome:
                 }
             ],
             model=model,
+            effort=effort,
         )
         native_latency = time.perf_counter() - started
         started = time.perf_counter()
@@ -250,6 +264,7 @@ def _check_pdf_input(client: ChatClient, model: str) -> CheckOutcome:
                 }
             ],
             model=model,
+            effort=effort,
         )
         extracted_latency = time.perf_counter() - started
     except Exception as exc:
@@ -351,7 +366,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     load_dotenv()
     parser = argparse.ArgumentParser(description="Live Meta Model API smoke test.")
     parser.add_argument("--audio", type=Path, default=None, help="WAV file to transcribe")
+    parser.add_argument(
+        "--effort",
+        default="default",
+        choices=("default", "minimal", "low", "medium", "high"),
+        help="reasoning effort for the chat checks (default omits the parameter)",
+    )
     args = parser.parse_args(argv)
+    effort = None if args.effort == "default" else args.effort
 
     try:
         settings = MetaSettings.from_env()
@@ -359,13 +381,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"setup FAILED: {exc}")
         return 1
     key_source = "META_API_KEY" if os.environ.get("META_API_KEY") else "MODEL_API_KEY"
-    print(f"key_source={key_source} base_url={settings.base_url}")
+    print(f"key_source={key_source} base_url={settings.base_url} effort={args.effort}")
 
     client = OpenAICompatChatClient(settings)
     outcomes = [
-        _check_tool_roundtrip(client, settings.model_agent),
-        _check_structured_json(client, settings.model_fast),
-        _check_pdf_input(client, settings.model_agent),
+        _check_tool_roundtrip(client, settings.model_agent, effort),
+        _check_structured_json(client, settings.model_fast, effort),
+        _check_pdf_input(client, settings.model_agent, effort),
         _check_transcribe(settings, args.audio),
     ]
     failed = 0

@@ -24,8 +24,10 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     from .blueprints.agent import bp as agent_bp
     from .blueprints.auth import bp as auth_bp
     from .blueprints.bookings import bp as bookings_bp
+    from .blueprints.cases import bp as cases_bp
     from .blueprints.professors import bp as professors_bp
 
+    app.register_blueprint(cases_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(professors_bp, url_prefix="/professors")
     app.register_blueprint(bookings_bp, url_prefix="/bookings")

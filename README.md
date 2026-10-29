@@ -17,8 +17,9 @@ seed data are synthetic sample data — no real names or photos.
 Built so far: Step 1 scaffold (factory, models, seed, Meta client, smoke
 tests), Step 2 session auth (register/login/logout, role guards) plus the base
 Jinja + Tailwind shell, Step 2b security close-out (seed demo logins, SECRET_KEY
-fail-fast, CSRF, hardened cookies) and a live Meta API check script. No agent,
-matching, booking, email, transcription, PDF or eval code exists yet.
+fail-fast, CSRF, hardened cookies) and a live Meta API check script, Step 3a
+student intake with document diagnosis and a live agent timeline. No matching,
+booking, email, recording, transcription, PDF notes or eval code exists yet.
 
 ## Stack
 
@@ -52,7 +53,9 @@ professors / 3 students, re-seed is idempotent, tool loop works with a fake
 client (no network) and logs to `ToolCallLog`. Auth coverage:
 register→login→logout, wrong-password/unknown-email rejection, duplicate and
 invalid input rejection, seeded users log in, NULL-hash rows blocked, login
-and role guards, tokenless POSTs rejected with CSRF on.
+and role guards, tokenless POSTs rejected with CSRF on. Intake coverage:
+PDF/DOCX/TXT extraction, upload validation, grounding checker, owner-only
+access, CSRF on the intake form, background pipeline runs (fake client).
 
 ## Layout
 
@@ -62,19 +65,24 @@ app/
   config.py          env-only config (see .env.example)
   extensions.py      shared extensions (db)
   models.py          User, ProfessorProfile, StudentProfile, Document,
-                     CaseFile, Booking, SessionRecord, MemoryNote, ToolCallLog
+                     CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
+                     ToolCallLog
   security.py        current_user, login_required, role_required
-  blueprints/        auth (register/login/logout), professors, bookings,
-                     agent (health routes only)
-  templates/         base shell + index + auth pages (Jinja + Tailwind CDN)
+  blueprints/        auth (register/login/logout), cases (dashboard, intake,
+                     detail, events), professors, bookings, agent (health only)
+  templates/         base shell + design macros (_ui.html) + auth/case pages
   services/
     meta_client.py   Meta API: retries, structured output, run_tool_loop
+    extraction.py    upload validation, storage, text extraction
+    diagnosis.py     diagnosis prompt, grounding check, intake pipeline
     email_service.py stub (provider TBD)
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
 scripts/seed.py      idempotent synthetic seed (12 profs / 4 depts / 3 students)
 scripts/check_meta.py live Meta API smoke test (never run by pytest)
-tests/               pytest suite (smoke + auth)
+scripts/make_samples.py regenerates samples/ fixtures
+samples/             synthetic thesis excerpts + expected.json (demo fixtures)
+tests/               pytest suite (smoke + auth + intake)
 ```
 
 ## Live API check
@@ -86,6 +94,14 @@ labels. It prints model, latency and token usage per call, never prints
 secrets, and exits non-zero with the exact error on any failure. Requires
 `META_API_KEY` plus the `META_MODEL_*` ids in `.env`; each run spends a small
 amount of API credit.
+
+## Intake demo
+
+Log in as a seeded student (any `sample-student-0X@example.com` address with
+`SEED_DEMO_PASSWORD`), open Dashboard, and submit a new request with
+`samples/thesis_excerpt_stats.pdf` attached. The case page shows the agent
+timeline on the right as each real step completes, then the diagnosis with
+grounded evidence quotes on the left.
 
 ## License
 

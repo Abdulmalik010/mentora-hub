@@ -7,11 +7,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-white text-slate-900 antialiased">
+{% from "_ui.html" import flash_messages %}
   <header class="border-b border-slate-200">
     <nav class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
       <a href="{{ url_for('index') }}" class="text-lg font-semibold tracking-tight">Mentora</a>
       <div class="flex items-center gap-4 text-sm">
         {% if current_user %}
+          {% if current_user.role == "student" %}
+            <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Dashboard</a>
+          {% endif %}
           <span class="text-slate-600">{{ current_user.display_name }} &middot; {{ current_user.role }}</span>
           <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -24,16 +28,8 @@
       </div>
     </nav>
   </header>
-  <main class="mx-auto max-w-3xl px-4 py-8">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        <ul class="mb-6 space-y-2">
-          {% for category, message in messages %}
-            <li class="rounded-md border px-3 py-2 text-sm {% if category == 'error' %}border-red-300 bg-red-50 text-red-800{% else %}border-slate-300 bg-slate-50 text-slate-700{% endif %}">{{ message }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-    {% endwith %}
+  <main class="{% block main_class %}mx-auto max-w-3xl px-4 py-8{% endblock %}">
+    {{ flash_messages() }}
     {% block content %}{% endblock %}
   </main>
   <script>

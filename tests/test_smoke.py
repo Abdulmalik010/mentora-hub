@@ -44,6 +44,7 @@ def test_models_import_and_tables_exist(app: Flask) -> None:
         "bookings",
         "session_records",
         "memory_notes",
+        "run_events",
         "tool_call_logs",
     }
     assert User.query.count() == 0
@@ -92,9 +93,11 @@ class FakeChatClient:
         *,
         model: str,
         response_format: dict[str, Any] | None = None,
+        effort: str | None = None,
     ) -> ChatResult:
         """Return the next scripted response; fail loudly without a model."""
         assert model, "tool loop must pass a model"
+        assert effort is None, "smoke fakes do not expect an effort override"
         self.calls += 1
         if self.calls <= len(self._tool_names):
             name = self._tool_names[self.calls - 1]

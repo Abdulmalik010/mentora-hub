@@ -28,3 +28,13 @@
 - 2026-10-28: Docs say native PDF input is a chat file block (base64 data URL + filename); DOCX is absent from the supported-MIME table so it needs the extracted-text path.
 - 2026-10-28: Docs say transcribe is multipart POST {base}/asr/transcribe (request JSON + audio WAV) with DIARIZATION speaker labels and turn-level timestamps only.
 - 2026-10-28: Live Meta check deferred by operator choice: check_meta validates (PDF xref ok, fail-fast ok) but made no live calls; run it before the intake step.
+- 2026-10-29: reasoning_effort plumbed via META_EFFORT_AGENT (unset = server default) and META_EFFORT_FAST (default low); 'none' rejected client-side per docs.
+- 2026-10-29: Effort delta, single-sample check_meta: Spark structured default 5.27s/962tok vs low 3.15s/378tok; Wonder tool loop 11.65s/261tok vs 16.00s/171tok (latency noisy); Wonder PDF out 1368 vs 1274. FAST stays low; AGENT stays server default for diagnosis quality.
+- 2026-10-29: Additive schema only: new RunEvent table plus CaseFile document_id/problem_text/status/run_id/grounding_rate; no destructive change.
+- 2026-10-29: New cases blueprint (dashboard, new, detail, events); case routes are student-only (professors 403, non-owners 404) until the professor case-file view lands.
+- 2026-10-29: Intake pipeline runs in a daemon thread with its own app context; the case page polls JSON events every second and reloads on done/error.
+- 2026-10-29: Uploads validated by extension plus magic bytes, stored UUID-named under uploads/ with a 10 MB cap; PDF via pypdf, DOCX via stdlib zip, scanned PDFs fall back to native file input.
+- 2026-10-29: Evidence quotes verified as normalized substrings in code; ungrounded quotes dropped and the grounding rate stored on CaseFile.
+- 2026-10-29: Diagnosis uses META_MODEL_AGENT with structured output; the document is delimited data with an ignore-instructions guard against prompt injection.
+- 2026-10-29: samples/ holds two original synthetic excerpts with planted flaws plus expected.json as committed demo/test fixtures.
+- 2026-10-29: Diagnosis calls get a 180s timeout (live e2e: Wonder took 78s on a 2-page excerpt; the 60s default timed out 3/3); routine calls keep 60s.

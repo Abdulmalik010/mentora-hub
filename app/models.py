@@ -115,6 +115,11 @@ class CaseFile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     professor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id"), nullable=True)
+    problem_text = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), nullable=False, default="pending")
+    run_id = db.Column(db.String(64), nullable=True, index=True)
+    grounding_rate = db.Column(db.Float, nullable=True)
     diagnosis = db.Column(db.JSON, nullable=False, default=dict)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
@@ -180,6 +185,21 @@ class MemoryNote(db.Model):
 
     student = db.relationship("User", foreign_keys=[student_id])
     session_record = db.relationship("SessionRecord", foreign_keys=[session_record_id])
+
+
+class RunEvent(db.Model):
+    """One step in an agent run timeline, polled live by the case page."""
+
+    __tablename__ = "run_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(db.String(64), nullable=False, index=True)
+    seq = db.Column(db.Integer, nullable=False)
+    type = db.Column(db.String(40), nullable=False)
+    label = db.Column(db.String(200), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="ok")
+    payload = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
 
 class ToolCallLog(db.Model):

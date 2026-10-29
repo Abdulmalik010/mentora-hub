@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card, button, badge, section_header, empty_state %}
+{% block title %}Case #{{ case.id }} &middot; Mentora{% endblock %}
+{% block main_class %}mx-auto max-w-6xl px-4 py-8{% endblock %}
+{% block content %}
+{% set tone = {"done": "ok", "running": "info", "error": "bad"}.get(case.status, "neutral") %}
+<div class="mb-5 flex items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-bold tracking-tight">Case #{{ case.id }}</h1>
+    <p class="mt-1 max-w-2xl text-sm text-slate-600">{{ case.problem_text }}</p>
+  </div>
+  <div class="shrink-0 pt-1">{{ badge(case.status, tone=tone) }}</div>
+</div>
+<div class="grid gap-6 md:grid-cols-2">
+  <div>
+    {{ section_header("Diagnosis") }}
+    {% if case.status == "done" and case.diagnosis %}
+      {% set d = case.diagnosis %}
+      <div class="space-y-4">
+        {% call card() %}
+          <div class="flex flex-wrap gap-2">
+            {{ badge(d.get("field", "?"), tone="info") }}
+            {{ badge(d.get("level", "?")) }}
+            {{ badge("confidence %.0f%%" % ((d.get("confidence") or 0) * 100)) }}
+            {% if case.grounding_rate is not none %}
+              {{ badge("grounding %.0f%%" % (case.grounding_rate * 100), tone="ok" if case.grounding_rate >= 0.8 else "warn") }}
+            {% endif %}
+          </div>
+          <p class="mt-3 text-sm leading-relaxed">{{ d.get("core_problem", "") }}</p>
+        {% endcall %}
+        {% for gap in d.get("gaps", []) %}
+          {% call card() %}
+            <div class="flex items-center justify-between gap-3">
+              {{ badge(gap.get("category", "other"), tone="info") }}
+              {{ badge("severity %d/3" % gap.get("severity", 1), tone="warn" if gap.get("severity", 1) >= 2 else "neutral") }}
+            </div>
+            <p class="mt-2 text-sm leading-relaxed">{{ gap.get("description", "") }}</p>
+            {% if gap.get("evidence") %}
+              <ul class="mt-3 space-y-2 border-t border-slate-100 pt-3">
+                {% for ev in gap.get("evidence", []) %}
+                  <li class="text-sm">
+                    <span class="text-xs font-medium text-slate-500">[page {{ ev.get("page", "?") }}]</span>
+                    <span class="text-slate-700">&ldquo;{{ ev.get("quote", "") }}&rdquo;</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endcall %}
+        {% endfor %}
+        {% if d.get("what_student_already_tried") %}
+          {% call card() %}
+            <h2 class="text-sm font-semibold">Already tried</h2>
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {% for item in d.get("what_student_already_tried", []) %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endcall %}
+        {% endif %}
+        {% if d.get("questions_for_professor") %}
+          {% call card() %}
+            <h2 class="text-sm font-semibold">Questions for a professor</h2>
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {% for item in d.get("questions_for_professor", []) %}
+                <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          {% endcall %}
+        {% endif %}
+        {% if d.get("expertise_keywords") %}
+          <div class="flex flex-wrap gap-2">
+            {% for kw in d.get("expertise_keywords", []) %}
+              {{ badge(kw) }}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% elif case.status == "error" %}
+      {{ empty_state("Diagnosis failed", "The run hit an error; the timeline on the right shows what happened.") }}
+    {% else %}
+      {{ empty_state("Diagnosis running", "The agent is working through your request. Steps appear in the timeline as they complete.") }}
+    {% endif %}
+  </div>
+  <div>
+    {{ section_header("Agent timeline") }}
+    {% call card() %}
+      <ol id="timeline" class="space-y-3" data-after="{{ events[-1].seq if events else 0 }}">
+        {% for event in events %}
+          <li class="flex gap-3 text-sm" data-seq="{{ event.seq }}">
+            <span class="mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-red-500' if event.status == 'error' else 'bg-teal-700' }}"></span>
+            <span>{{ event.label }}</span>
+          </li>
+        {% endfor %}
+      </ol>
+      <p id="timeline-note" class="mt-3 text-xs text-slate-500">
+        {% if case.status in ("done", "error") %}Run finished.{% else %}Live: updating every second.{% endif %}
+      </p>
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var list = document.getElementById('timeline');
+    var note = document.getElementById('timeline-note');
+    var after = parseInt(list.getAttribute('data-after') || '0', 10);
+    var url = window.location.pathname + '/events';
+    function dot(status) {
+      var s = document.createElement('span');
+      s.className = 'mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full '
+        + (status === 'error' ? 'bg-red-500' : 'bg-teal-700');
+      return s;
+    }
+    function poll() {
+      fetch(url + '?after=' + after, {headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          (data.events || []).forEach(function (ev) {
+            var li = document.createElement('li');
+            li.className = 'flex gap-3 text-sm';
+            li.appendChild(dot(ev.status));
+            var label = document.createElement('span');
+            label.textContent = ev.label;
+            li.appendChild(label);
+            list.appendChild(li);
+            if (ev.seq > after) { after = ev.seq; }
+          });
+          if (data.status === 'done' || data.status === 'error') {
+            note.textContent = 'Run finished. Reloading\u2026';
+            window.location.reload();
+          } else {
+            window.setTimeout(poll, 1000);
+          }
+        })
+        .catch(function () { window.setTimeout(poll, 3000); });
+    }
+    {% if case.status not in ("done", "error") %}
+    window.setTimeout(poll, 1000);
+    {% endif %}
+  })();
+</script>
+{% endblock %}

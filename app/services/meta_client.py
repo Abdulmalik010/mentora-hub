@@ -36,12 +36,41 @@ DEFAULT_TIMEOUT_S = 60.0
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_BACKOFF_S = 1.0
 DEFAULT_MAX_ITERATIONS = 8
+DEFAULT_EFFORT_FAST = "low"
+# Per /docs/reasoning: Chat Completions `reasoning_effort`. "none" makes Muse
+# models return HTTP 400, so it is rejected client-side.
+VALID_EFFORTS = ("minimal", "low", "medium", "high", "xhigh", "max")
 
 T = TypeVar("T")
 
 
 class MetaClientError(RuntimeError):
     """Meta API configuration, request or tool-loop failure."""
+
+
+def _clean_api_key(raw: str | None, source: str) -> str:
+    """Validate a key; fail clearly on embedded whitespace or newlines."""
+    if raw is None or not raw.strip():
+        return ""
+    if raw != raw.strip() or any(char.isspace() for char in raw):
+        raise MetaClientError(
+            f"{source} contains whitespace or a newline; check .env quoting "
+            "and remove stray spaces or line breaks"
+        )
+    return raw
+
+
+def _clean_effort(value: str | None, name: str) -> str | None:
+    """Normalize an effort value; None means the server default."""
+    if value is None or not value.strip():
+        return None
+    effort = value.strip().lower()
+    if effort not in VALID_EFFORTS:
+        raise MetaClientError(
+            f"{name} must be one of {', '.join(VALID_EFFORTS)} "
+            f"(got {value!r}); 'none' is rejected by Muse models"
+        )
+    return effort
 
 
 @dataclass(frozen=True)
@@ -55,20 +84,30 @@ class MetaSettings:
     model_transcribe: str = ""
     timeout_s: float = DEFAULT_TIMEOUT_S
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
+    effort_agent: str | None = None
+    effort_fast: str = DEFAULT_EFFORT_FAST
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> MetaSettings:
         """Build settings from env; META_API_KEY preferred, MODEL_API_KEY fallback."""
         env = environ if environ is not None else os.environ
-        api_key = env.get("META_API_KEY") or env.get("MODEL_API_KEY", "")
+        raw_key = env.get("META_API_KEY")
+        source = "META_API_KEY"
+        if raw_key is None:
+            raw_key = env.get("MODEL_API_KEY")
+            source = "MODEL_API_KEY"
+        api_key = _clean_api_key(raw_key, source)
         if not api_key:
             raise MetaClientError("set META_API_KEY (preferred) or MODEL_API_KEY")
         return cls(
             api_key=api_key,
-            base_url=env.get("META_BASE_URL") or DEFAULT_BASE_URL,
-            model_agent=env.get("META_MODEL_AGENT", ""),
-            model_fast=env.get("META_MODEL_FAST", ""),
-            model_transcribe=env.get("META_MODEL_TRANSCRIBE", ""),
+            base_url=(env.get("META_BASE_URL") or "").strip() or DEFAULT_BASE_URL,
+            model_agent=(env.get("META_MODEL_AGENT") or "").strip(),
+            model_fast=(env.get("META_MODEL_FAST") or "").strip(),
+            model_transcribe=(env.get("META_MODEL_TRANSCRIBE") or "").strip(),
+            effort_agent=_clean_effort(env.get("META_EFFORT_AGENT"), "META_EFFORT_AGENT"),
+            effort_fast=_clean_effort(env.get("META_EFFORT_FAST"), "META_EFFORT_FAST")
+            or DEFAULT_EFFORT_FAST,
         )
 
 
@@ -114,6 +153,7 @@ class ChatClient(Protocol):
         *,
         model: str,
         response_format: dict[str, Any] | None = None,
+        effort: str | None = None,
     ) -> ChatResult:
         """Send messages and return the normalized response."""
         ...
@@ -178,10 +218,14 @@ class OpenAICompatChatClient:
         *,
         model: str,
         response_format: dict[str, Any] | None = None,
+        effort: str | None = None,
     ) -> ChatResult:
         """Call Chat Completions with retries; normalize to ChatResult."""
         if not model:
             raise MetaClientError("no model configured (set META_MODEL_*)")
+        extra: dict[str, Any] = {}
+        if effort is not None:
+            extra["reasoning_effort"] = effort
 
         def _call():  # type: ignore[no-untyped-def]
             return self._client.chat.completions.create(
@@ -189,6 +233,7 @@ class OpenAICompatChatClient:
                 messages=messages,  # type: ignore[arg-type]
                 tools=list(tools) if tools else None,  # type: ignore[arg-type]
                 response_format=response_format,  # type: ignore[arg-type]
+                **extra,  # type: ignore[arg-type]
             )
 
         response = with_retries(_call, max_attempts=self._settings.max_attempts)
@@ -235,6 +280,7 @@ def complete_json(
     model: str,
     schema: dict[str, Any],
     name: str,
+    effort: str | None = None,
 ) -> dict[str, Any]:
     """Request schema-conforming JSON via response_format; return parsed dict."""
     result = client.chat(
@@ -244,6 +290,7 @@ def complete_json(
             "type": "json_schema",
             "json_schema": {"name": name, "schema": schema},
         },
+        effort=effort,
     )
     try:
         parsed = json.loads(result.text)
@@ -285,6 +332,7 @@ def run_tool_loop(
     log_tool_call: Callable[[ToolCallRecord], None] | None = None,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
     run_id: str | None = None,
+    effort: str | None = None,
 ) -> str:
     """Run a model/tools loop until a final answer or ``max_iterations``.
 
@@ -296,7 +344,7 @@ def run_tool_loop(
     active_run_id = run_id or uuid.uuid4().hex
     working = list(messages)
     for _ in range(max_iterations):
-        result = client.chat(working, tools, model=model)
+        result = client.chat(working, tools, model=model, effort=effort)
         if not result.tool_calls:
             return result.text
         working.append(
@@ -363,6 +411,7 @@ class MetaClient:
         *,
         model: str | None = None,
         response_format: dict[str, Any] | None = None,
+        effort: str | None = None,
     ) -> ChatResult:
         """Chat with the agent model unless another is given."""
         return self._chat.chat(
@@ -370,6 +419,7 @@ class MetaClient:
             tools,
             model=model or self.settings.model_agent,
             response_format=response_format,
+            effort=effort if effort is not None else self.settings.effort_agent,
         )
 
     def complete_json(
@@ -379,11 +429,13 @@ class MetaClient:
         schema: dict[str, Any],
         name: str,
         model: str | None = None,
+        effort: str | None = None,
     ) -> dict[str, Any]:
         """Schema-conforming JSON via the agent model unless another is given."""
         return complete_json(
             self._chat, messages, model=model or self.settings.model_agent,
             schema=schema, name=name,
+            effort=effort if effort is not None else self.settings.effort_agent,
         )
 
     def run_tool_loop(
@@ -396,6 +448,7 @@ class MetaClient:
         log_tool_call: Callable[[ToolCallRecord], None] | None = None,
         max_iterations: int = DEFAULT_MAX_ITERATIONS,
         run_id: str | None = None,
+        effort: str | None = None,
     ) -> str:
         """Tool loop via the agent model unless another is given."""
         return run_tool_loop(
@@ -407,4 +460,5 @@ class MetaClient:
             log_tool_call=log_tool_call,
             max_iterations=max_iterations,
             run_id=run_id,
+            effort=effort if effort is not None else self.settings.effort_agent,
         )

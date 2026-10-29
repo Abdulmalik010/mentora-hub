@@ -22,6 +22,7 @@ def app(tmp_path):  # type: ignore[no-untyped-def]
             "SECRET_KEY": "test-only-not-a-real-secret",
             "WTF_CSRF_ENABLED": False,  # CSRF has its own dedicated test
             "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path}/test.db",
+            "UPLOAD_FOLDER": str(tmp_path / "uploads"),
         }
     )
     ctx = app.app_context()

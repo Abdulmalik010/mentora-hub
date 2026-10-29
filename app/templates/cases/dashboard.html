@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card, button, badge, section_header, empty_state %}
+{% block title %}Dashboard &middot; Mentora{% endblock %}
+{% block content %}
+{{ section_header("Your cases", "Intake requests and their diagnoses.") }}
+<div class="mb-5">{{ button("New request", href=url_for("cases.new_form")) }}</div>
+{% if cases %}
+  <ul class="space-y-3">
+    {% for case in cases %}
+      {% set tone = {"done": "ok", "running": "info", "error": "bad"}.get(case.status, "neutral") %}
+      <li>
+        {% call card() %}
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <a href="{{ url_for('cases.detail', case_id=case.id) }}" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Case #{{ case.id }}</a>
+              <p class="mt-1 truncate text-sm text-slate-600">{{ case.problem_text or "(no problem text)" }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ case.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</p>
+            </div>
+            <div class="shrink-0">{{ badge(case.status, tone=tone) }}</div>
+          </div>
+        {% endcall %}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  {{ empty_state("No cases yet", "Describe your thesis or coursework problem and the agent will diagnose the real gap.", action_href=url_for("cases.new_form"), action_label="New request") }}
+{% endif %}
+{% endblock %}

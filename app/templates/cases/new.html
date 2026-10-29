@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "_ui.html" import button, section_header %}
+{% block title %}New request &middot; Mentora{% endblock %}
+{% block content %}
+{{ section_header("New request", "Describe the problem. Attach a chapter or problem document if you have one.") }}
+<form method="post" action="{{ url_for('cases.create_case') }}" enctype="multipart/form-data" class="max-w-xl space-y-5">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <div class="flex items-center justify-between">
+      <label for="problem_text" class="block text-sm font-medium">What are you stuck on? (min 20 characters)</label>
+      <button type="button" disabled title="Voice input is coming next" class="cursor-not-allowed rounded-md border border-slate-200 px-2 py-1 text-sm text-slate-400" aria-label="Voice input, coming next">&#127908;</button>
+    </div>
+    <textarea id="problem_text" name="problem_text" rows="5" required minlength="20"
+      placeholder="e.g. My regression residuals fan out and my supervisor says the standard errors are wrong."
+      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">{{ request.form.get('problem_text', '') }}</textarea>
+  </div>
+  <div>
+    <label for="document" class="block text-sm font-medium">Document (optional: PDF, DOCX, TXT, MD — max 10 MB)</label>
+    <input id="document" name="document" type="file" accept=".pdf,.docx,.txt,.md"
+      class="mt-1 w-full text-sm text-slate-700">
+  </div>
+  <div class="flex gap-3">
+    {{ button("Submit for diagnosis") }}
+    {{ button("Cancel", href=url_for("cases.dashboard"), variant="secondary") }}
+  </div>
+</form>
+{% endblock %}

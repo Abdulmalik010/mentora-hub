@@ -1,0 +1,62 @@
+{# Design system: restrained academic palette (paper white, slate ink, deep
+   teal actions), compact type scale, reusable macros. Agent workspace
+   styling throughout: no chat bubbles anywhere. #}
+
+{% macro flash_messages() %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul class="mb-6 space-y-2">
+      {% for category, message in messages %}
+        <li class="rounded-md border px-3 py-2 text-sm {% if category == 'error' %}border-red-300 bg-red-50 text-red-800{% else %}border-slate-300 bg-slate-50 text-slate-700{% endif %}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+{% endmacro %}
+
+{% macro card() %}
+<section class="rounded-lg border border-slate-200 bg-white px-5 py-4 shadow-sm">{{ caller() }}</section>
+{% endmacro %}
+
+{% macro button(label, href=None, variant="primary") %}
+{% if variant == "primary" %}
+  {% set cls = "rounded-md bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700" %}
+{% else %}
+  {% set cls = "rounded-md border border-slate-300 px-4 py-2 text-sm font-medium hover:border-slate-400" %}
+{% endif %}
+{% if href %}
+  <a href="{{ href }}" class="{{ cls }}">{{ label }}</a>
+{% else %}
+  <button type="submit" class="{{ cls }}">{{ label }}</button>
+{% endif %}
+{% endmacro %}
+
+{% macro badge(text, tone="neutral") %}
+{% set tones = {
+  "neutral": "border-slate-300 bg-slate-50 text-slate-700",
+  "ok": "border-emerald-300 bg-emerald-50 text-emerald-800",
+  "info": "border-sky-300 bg-sky-50 text-sky-800",
+  "warn": "border-amber-300 bg-amber-50 text-amber-800",
+  "bad": "border-red-300 bg-red-50 text-red-800",
+} %}
+<span class="inline-block rounded-full border px-2.5 py-0.5 text-xs font-medium {{ tones.get(tone, tones['neutral']) }}">{{ text }}</span>
+{% endmacro %}
+
+{% macro section_header(title, subtitle=None) %}
+<div class="mb-5">
+  <h1 class="text-xl font-bold tracking-tight">{{ title }}</h1>
+  {% if subtitle %}
+    <p class="mt-1 text-sm text-slate-600">{{ subtitle }}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro empty_state(title, body, action_href=None, action_label=None) %}
+<div class="rounded-lg border border-dashed border-slate-300 px-5 py-8 text-center">
+  <p class="font-medium">{{ title }}</p>
+  <p class="mx-auto mt-1 max-w-md text-sm text-slate-600">{{ body }}</p>
+  {% if action_href and action_label %}
+    <div class="mt-4">{{ button(action_label, href=action_href) }}</div>
+  {% endif %}
+</div>
+{% endmacro %}

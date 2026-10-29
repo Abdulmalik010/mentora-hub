@@ -54,6 +54,27 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
             return "₦—"
         return f"₦{amount:,.0f}"
 
+    @app.template_filter("wat")
+    def format_wat_filter(value: object) -> str:
+        """Naive-UTC datetime as a WAT slot string (``—`` when missing)."""
+        from datetime import datetime
+
+        from .services.slots import format_wat
+
+        if not isinstance(value, datetime):
+            return "—"
+        return format_wat(value)
+
+    @app.template_filter("utc_iso")
+    def format_utc_iso(value: object) -> str:
+        """Naive-UTC datetime as an ISO ``Z`` string for the local-time hint."""
+        from datetime import datetime, timezone
+
+        if not isinstance(value, datetime):
+            return ""
+        moment = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return moment.astimezone(timezone.utc).isoformat()
+
     @app.get("/")
     def index() -> str:
         """Home page (factory-level route; no extra blueprint for one page)."""

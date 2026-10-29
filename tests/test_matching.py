@@ -383,7 +383,8 @@ def test_case_detail_shows_match_cards(app: Flask) -> None:
     assert "Recommended professors" in html
     assert "Match score 90 out of 100" in html
     assert 'href="#gap-g1"' in html
-    assert "Book session: coming next" in html
+    assert f"/cases/{case.id}/book/12" in html
+    assert "₦22,000" in html
 
 
 def test_full_pipeline_includes_matching(app: Flask, tmp_path) -> None:  # type: ignore[no-untyped-def]

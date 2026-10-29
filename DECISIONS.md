@@ -56,3 +56,9 @@
 - 2026-10-29: Prices render as NGN via the ngn filter (thousands separators); seed rates are sample pricing, labeled in the UI.
 - 2026-10-29: tzdata 2026.6 pinned so ZoneInfo('Africa/Lagos') resolves on Windows.
 - 2026-10-29: Dashboard case cards show the diagnosis core_problem headline when a diagnosis exists.
+- 2026-10-29: Booking reuses scheduled_at as the naive-UTC slot start; 60 minutes is a SLOT_MINUTES constant (end computed); unique(professor_id, scheduled_at) is the race backstop — recreate dev DBs, create_all cannot add it to existing tables.
+- 2026-10-29: Booking gains case_id/meeting_url/consent_share_diagnosis; demo checkout sets status confirmed, a Jitsi URL with a random token, and a DEMO- payment ref.
+- 2026-10-29: Slots come from the weekly availability grid for day offsets 1..14 in WAT; submitted keys are re-validated against a fresh grid and booked starts are filtered.
+- 2026-10-29: Booking requires a MatchResult for the (case, professor) pair (404 otherwise); /sessions routes live in the student-workspace blueprint because the /bookings prefix does not fit them.
+- 2026-10-29: The consent checkbox is mandatory; demo card fields are ignored server-side and never stored.
+- 2026-10-29: Times are stored UTC, rendered WAT server-side, with a JS local-time hint from a data-utc attribute.

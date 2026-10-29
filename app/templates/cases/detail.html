@@ -162,10 +162,10 @@
                 <p class="text-muted">Next open slot: <strong class="font-semibold text-ink">{{ m.next_slot or "on request" }}</strong>
                   {% if p.rate is not none %}<span>· {{ p.rate|ngn }}/session (sample pricing)</span>{% endif %}
                 </p>
-                <button type="button" disabled title="Booking opens in the next step"
-                    class="cursor-not-allowed rounded-lg border border-border bg-paper px-4 py-2 text-sm font-semibold text-muted">
-                  Book session: coming next
-                </button>
+                <a href="{{ url_for('cases.book_form', case_id=case.id, professor_id=prof.id) }}"
+                    class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover">
+                  Book session
+                </a>
               </div>
             </section>
           {% endfor %}

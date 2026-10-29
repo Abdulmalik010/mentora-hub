@@ -132,20 +132,29 @@ class CaseFile(db.Model):
 
 
 class Booking(db.Model):
-    """A booked slot between a student and a professor; payment is mocked."""
+    """A booked 60-minute slot; ``scheduled_at`` is the naive-UTC start."""
 
     __tablename__ = "bookings"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "professor_id", "scheduled_at", name="uq_booking_professor_start"
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     professor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    case_id = db.Column(db.Integer, db.ForeignKey("case_files.id"), nullable=True)
     status = db.Column(db.String(20), nullable=False, default="pending")
     scheduled_at = db.Column(db.DateTime, nullable=True)
+    meeting_url = db.Column(db.String(500), nullable=True)
+    consent_share_diagnosis = db.Column(db.Boolean, nullable=False, default=False)
     mock_payment_ref = db.Column(db.String(120), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     student = db.relationship("User", foreign_keys=[student_id])
     professor = db.relationship("User", foreign_keys=[professor_id])
+    case = db.relationship("CaseFile", foreign_keys=[case_id])
     session_record = db.relationship(
         "SessionRecord",
         back_populates="booking",

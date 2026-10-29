@@ -1,4 +1,4 @@
-"""Student cases: dashboard, intake form, case detail, event stream."""
+"""Student workspace: dashboard, intake, case detail, booking, sessions."""
 from __future__ import annotations
 
 import threading
@@ -13,11 +13,16 @@ from flask import (
 from flask import Flask
 
 from ..extensions import db
-from ..models import CaseFile, Document, ProfessorProfile, RunEvent, User
+from ..models import (
+    Booking, CaseFile, Document, MatchResult, ProfessorProfile, RunEvent,
+    User,
+)
 from ..security import current_user, role_required
+from ..services.booking import SlotTakenError, create_booking
 from ..services.diagnosis import run_case_pipeline
 from ..services.extraction import ExtractionError, save_upload, validate_upload
 from ..services.matching import get_case_matches
+from ..services.slots import Slot, generate_slots, slot_from_key
 
 bp = Blueprint("cases", __name__)
 
@@ -183,3 +188,149 @@ def too_large(error: Any) -> Response:
     """Oversized bodies bounce back to the intake form with an explanation."""
     flash("Upload too large: the limit is 10 MB per file.", "error")
     return redirect(url_for("cases.new_form"))
+
+
+def _matched_professor_or_404(
+    case: CaseFile, professor_id: int
+) -> tuple[User, ProfessorProfile, MatchResult]:
+    """Match row plus professor/profile; 404 unless this case matched them."""
+    match = MatchResult.query.filter_by(
+        case_id=case.id, professor_id=professor_id
+    ).first()
+    professor = db.session.get(User, professor_id)
+    profile = ProfessorProfile.query.filter_by(user_id=professor_id).first()
+    if (
+        match is None
+        or professor is None
+        or profile is None
+        or professor.role != "professor"
+    ):
+        abort(404)
+    return professor, profile, match
+
+
+def _open_slots(professor_id: int, profile: ProfessorProfile) -> list[Slot]:
+    """Generated slots minus already-booked starts."""
+    booked = {
+        row[0]
+        for row in db.session.query(Booking.scheduled_at)
+        .filter_by(professor_id=professor_id)
+        .all()
+    }
+    return [
+        slot
+        for slot in generate_slots(profile.availability or {})
+        if slot.start_naive_utc not in booked
+    ]
+
+
+def _render_book_form(
+    case: CaseFile,
+    professor: User,
+    profile: ProfessorProfile,
+    match: MatchResult,
+    status: int = 200,
+) -> tuple[str, int]:
+    """Book page with slots grouped by WAT day."""
+    groups: dict[str, list[Slot]] = {}
+    for slot in _open_slots(professor.id, profile):
+        wat = slot.start_wat
+        groups.setdefault(f"{wat.strftime('%A, %B')} {wat.day}", []).append(slot)
+    ordered = [
+        (day, slots)
+        for day, slots in sorted(
+            groups.items(), key=lambda item: item[1][0].start_utc
+        )
+    ]
+    return (
+        render_template(
+            "cases/book.html",
+            case=case,
+            professor=professor,
+            profile=profile,
+            match=match,
+            slot_groups=ordered,
+        ),
+        status,
+    )
+
+
+@bp.get("/cases/<int:case_id>/book/<int:professor_id>")
+@role_required("student")
+def book_form(case_id: int, professor_id: int) -> tuple[str, int]:
+    """Slot picker, session summary, consent and demo payment."""
+    case = _own_case_or_404(case_id)
+    professor, profile, match = _matched_professor_or_404(case, professor_id)
+    return _render_book_form(case, professor, profile, match)
+
+
+@bp.post("/cases/<int:case_id>/book/<int:professor_id>")
+@role_required("student")
+def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
+    """Validate slot plus consent, then race-safe create the booking."""
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    case = _own_case_or_404(case_id)
+    professor, profile, match = _matched_professor_or_404(case, professor_id)
+    slot = slot_from_key(request.form.get("slot", ""))
+    valid_keys = {
+        open_slot.key for open_slot in _open_slots(professor.id, profile)
+    }
+    if slot is None or slot.key not in valid_keys:
+        flash("Pick a valid open slot.", "error")
+        return _render_book_form(case, professor, profile, match, 400)
+    if request.form.get("consent") != "yes":
+        flash("Consent to share your diagnosis is required.", "error")
+        return _render_book_form(case, professor, profile, match, 400)
+    try:
+        booking = create_booking(
+            student_id=user.id,
+            professor_id=professor.id,
+            case_id=case.id,
+            start_naive_utc=slot.start_naive_utc,
+            consent_share_diagnosis=True,
+        )
+    except SlotTakenError as exc:
+        flash(str(exc), "error")
+        return _render_book_form(case, professor, profile, match, 409)
+    flash("Session booked. The meeting link is on this page.", "success")
+    return redirect(url_for("cases.session_detail", booking_id=booking.id))
+
+
+@bp.get("/sessions")
+@role_required("student")
+def sessions_list() -> str:
+    """Student's bookings, soonest first."""
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    bookings = (
+        Booking.query.filter_by(student_id=user.id)
+        .order_by(Booking.scheduled_at.asc())
+        .all()
+    )
+    rows = [
+        {
+            "booking": booking,
+            "professor": db.session.get(User, booking.professor_id),
+        }
+        for booking in bookings
+    ]
+    return render_template("sessions/list.html", rows=rows)
+
+
+@bp.get("/sessions/<int:booking_id>")
+@role_required("student")
+def session_detail(booking_id: int) -> str:
+    """One booking: slot, meeting link, case, consent and demo receipt."""
+    booking = db.session.get(Booking, booking_id)
+    user = current_user()
+    if booking is None or user is None or booking.student_id != user.id:
+        abort(404)
+    professor = db.session.get(User, booking.professor_id)
+    case = db.session.get(CaseFile, booking.case_id) if booking.case_id else None
+    return render_template(
+        "sessions/detail.html",
+        booking=booking,
+        professor=professor,
+        case=case,
+    )

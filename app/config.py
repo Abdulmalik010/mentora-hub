@@ -50,6 +50,7 @@ class Config:
     # 10 MB file cap enforced in code; Flask-level cap adds form overhead.
     MAX_CONTENT_LENGTH: int = 10 * 1024 * 1024 + 512 * 1024
     UPLOAD_FOLDER: str = _get("UPLOAD_FOLDER") or str(_PROJECT_ROOT / "uploads")
+    DIAGNOSIS_MODE: str = _get("DIAGNOSIS_MODE") or "parallel"
 
     # META_API_KEY preferred; MODEL_API_KEY accepted (the name Meta docs use).
     META_API_KEY: str | None = _get("META_API_KEY") or _get("MODEL_API_KEY")

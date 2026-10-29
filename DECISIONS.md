@@ -40,3 +40,5 @@
 - 2026-10-29: Diagnosis calls get a 180s timeout (live e2e: Wonder took 78s on a 2-page excerpt; the 60s default timed out 3/3); routine calls keep 60s.
 - 2026-10-29: Redesign tokens live once in templates/_head.html (Tailwind v4 @theme); original inline-SVG logo/icons plus favicon; Fraunces display + Inter UI.
 - 2026-10-29: Case stepper stages derive from real RunEvents and toasts render server-side (no-JS safe); error pages share the macro set.
+- 2026-10-29: Parallel diagnosis: 3 concurrent Spark specialists (FAST model) plus a Spark merge; live probe 13.4s wall (specialists 5.5/6.1/6.3s, merge 7.0s, ~7.4k tokens) vs 78s single Wonder call.
+- 2026-10-29: Specialist or merge failure degrades (flagged partial result), it never kills the run unless all specialists fail; event seq guarded by a thread lock; SQLite WAL plus 5s busy timeout.

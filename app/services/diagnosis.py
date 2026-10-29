@@ -8,8 +8,11 @@ before anything is persisted.
 from __future__ import annotations
 
 import base64
+import json
+import threading
 import time
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -97,6 +100,39 @@ DIAGNOSIS_SCHEMA: dict[str, Any] = {
 GAP_CATEGORIES = (
     "methodology", "statistics", "literature", "theory", "data", "writing", "other",
 )
+
+# Specialists return gaps only; the merge pass writes the prose fields.
+SPECIALIST_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {"gaps": DIAGNOSIS_SCHEMA["properties"]["gaps"]},
+    "required": ["gaps"],
+    "additionalProperties": False,
+}
+MERGE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "field": {"type": "string"},
+        "level": {"type": "string"},
+        "core_problem": {"type": "string"},
+        "what_student_already_tried": {"type": "array", "items": {"type": "string"}},
+        "questions_for_professor": {"type": "array", "items": {"type": "string"}},
+        "expertise_keywords": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    },
+    "required": [
+        "field", "level", "core_problem", "what_student_already_tried",
+        "questions_for_professor", "expertise_keywords", "confidence",
+    ],
+    "additionalProperties": False,
+}
+SPECIALISTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("methodology", ("methodology",)),
+    ("statistics", ("statistics", "data")),
+    ("breadth", ("literature", "theory", "writing", "other")),
+)
+
+# Serializes per-run event sequence numbers across worker threads.
+_EVENT_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -191,15 +227,16 @@ def log_event(
     payload: dict[str, Any] | None = None,
 ) -> RunEvent:
     """Append one timeline event; sequence numbers are per-run. Commits."""
-    seq = (
-        db.session.query(func.max(RunEvent.seq)).filter_by(run_id=run_id).scalar() or 0
-    ) + 1
-    event = RunEvent(
-        run_id=run_id, seq=seq, type=type, label=label, status=status,
-        payload=payload or {},
-    )
-    db.session.add(event)
-    db.session.commit()
+    with _EVENT_LOCK:
+        seq = (
+            db.session.query(func.max(RunEvent.seq)).filter_by(run_id=run_id).scalar() or 0
+        ) + 1
+        event = RunEvent(
+            run_id=run_id, seq=seq, type=type, label=label, status=status,
+            payload=payload or {},
+        )
+        db.session.add(event)
+        db.session.commit()
     return event
 
 
@@ -293,21 +330,32 @@ def run_case_pipeline(
         case.status = "running"
         db.session.commit()
         try:
-            _run_pipeline(case, run_id, chat_client, model, effort)
+            mode = app.config.get("DIAGNOSIS_MODE") or "parallel"
+            if mode not in ("parallel", "single"):
+                raise ValueError(
+                    f"DIAGNOSIS_MODE must be parallel|single (got {mode!r})"
+                )
+            if mode == "parallel":
+                _run_parallel(app, case, run_id, chat_client, model, effort)
+            else:
+                _run_pipeline(case, run_id, chat_client, model, effort)
         except Exception as exc:
             case.status = "error"
             db.session.commit()
             log_event(run_id, "run_failed", f"Run failed: {exc}", status="error")
 
 
-def _run_pipeline(
-    case: CaseFile,
-    run_id: str,
-    chat_client: ChatClient | None,
-    model: str | None,
-    effort: str | None,
-) -> None:
-    """Pipeline body; raises on failure so the caller can mark the case."""
+@dataclass(frozen=True)
+class CaseInputs:
+    """Prepared intake content shared by both diagnosis modes."""
+
+    problem_text: str
+    extracted: ExtractedText | None
+    native_pdf: bytes | None
+
+
+def _prepare_inputs(case: CaseFile, run_id: str) -> CaseInputs:
+    """Log receipt, extract document text, decide native-PDF fallback."""
     problem_text = case.problem_text or ""
     document = db.session.get(Document, case.document_id) if case.document_id else None
     if document is not None:
@@ -344,6 +392,263 @@ def _run_pipeline(
             )
     else:
         log_event(run_id, "text_ready", "Diagnosing from problem text")
+    return CaseInputs(
+        problem_text=problem_text, extracted=extracted, native_pdf=native_pdf
+    )
+
+
+@dataclass(frozen=True)
+class SpecialistOutcome:
+    """Grounded gaps from one specialist pass, with cost telemetry."""
+
+    name: str
+    gaps: list[dict[str, Any]]
+    checked: int
+    dropped: int
+    latency_s: float
+    usage: dict[str, Any]
+
+
+def _build_specialist_messages(
+    inputs: CaseInputs, name: str, categories: tuple[str, ...]
+) -> list[dict[str, Any]]:
+    """Prompt messages; the focus marker routes fakes in offline tests."""
+    focus = f"CATEGORY FOCUS: {name} ({', '.join(categories)})"
+    instruction = (
+        f"{focus}\nReturn ONLY gaps in your focus categories, "
+        "with verbatim evidence quotes."
+    )
+    messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if inputs.native_pdf is not None:
+        data_url = "data:application/pdf;base64," + base64.b64encode(
+            inputs.native_pdf
+        ).decode()
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": (
+                            f"{instruction}\nStudent problem:\n{DOC_BEGIN}\n"
+                            f"{inputs.problem_text}\n{DOC_END}\n"
+                            "The attached PDF is the student's document."
+                        ),
+                    },
+                    {
+                        "type": "file",
+                        "file": {
+                            "filename": "student-document.pdf",
+                            "file_data": data_url,
+                        },
+                    },
+                ],
+            }
+        )
+        return messages
+    document_block = (
+        f"{DOC_BEGIN}\n{inputs.extracted.text}\n{DOC_END}"
+        if inputs.extracted is not None
+        else "(no document uploaded)"
+    )
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                f"{instruction}\nStudent problem:\n{DOC_BEGIN}\n"
+                f"{inputs.problem_text}\n{DOC_END}\n\n"
+                f"Student document:\n{document_block}"
+            ),
+        }
+    )
+    return messages
+
+
+def _specialist_pass(
+    app: Flask,
+    run_id: str,
+    name: str,
+    categories: tuple[str, ...],
+    messages: list[dict[str, Any]],
+    source_text: str,
+    chat_client: ChatClient,
+    model: str,
+    effort: str | None,
+) -> SpecialistOutcome:
+    """One specialist call with its own app context; raises on failure."""
+    with app.app_context():
+        recording = _UsageRecorder(chat_client)
+        started = time.perf_counter()
+        raw = complete_json(
+            recording, messages, model=model, schema=SPECIALIST_SCHEMA,
+            name=f"Gaps_{name}", effort=effort,
+        )
+        latency = time.perf_counter() - started
+        coerced = coerce_diagnosis(raw)
+        focused = [
+            gap for gap in coerced.get("gaps", [])
+            if gap.get("category") in categories
+        ]
+        result = check_grounding({"gaps": focused}, source_text)
+        usage = recording.results[-1].usage if recording.results else None
+        log_event(
+            run_id, "specialist_done",
+            f"{name}: {len(result.diagnosis['gaps'])} gaps in {latency:.1f}s",
+            payload={
+                "specialist": name,
+                "gaps": result.diagnosis["gaps"],
+                "checked": result.checked,
+                "dropped": result.dropped,
+                "latency_s": round(latency, 2),
+                "usage": usage or {},
+            },
+        )
+        return SpecialistOutcome(
+            name=name,
+            gaps=result.diagnosis["gaps"],
+            checked=result.checked,
+            dropped=result.dropped,
+            latency_s=latency,
+            usage=usage or {},
+        )
+
+
+def _merge_gaps(outcomes: list[SpecialistOutcome]) -> list[dict[str, Any]]:
+    """Dedupe by normalized description (keep higher severity), rank severity."""
+    merged: dict[str, dict[str, Any]] = {}
+    for outcome in outcomes:
+        for gap in outcome.gaps:
+            key = normalize_text(gap.get("description", ""))
+            if not key:
+                continue
+            current = merged.get(key)
+            if current is None or gap.get("severity", 1) > current.get("severity", 1):
+                merged[key] = gap
+    return sorted(merged.values(), key=lambda gap: gap.get("severity", 1), reverse=True)
+
+
+def _run_parallel(
+    app: Flask,
+    case: CaseFile,
+    run_id: str,
+    chat_client: ChatClient | None,
+    model: str | None,
+    effort: str | None,
+) -> None:
+    """Concurrent specialists plus a merge pass; partial failure tolerated."""
+    inputs = _prepare_inputs(case, run_id)
+    if chat_client is None or model is None:
+        settings = MetaSettings.from_env()
+        chat_client = chat_client or OpenAICompatChatClient(settings)
+        model = model or settings.model_fast
+        if effort is None:
+            effort = settings.effort_fast
+    source = inputs.problem_text if inputs.extracted is None else inputs.extracted.text
+    log_event(
+        run_id, "diagnosis_started",
+        f"Parallel diagnosis started ({model}, 3 specialists)",
+        payload={"model": model, "mode": "parallel"},
+    )
+    specialist_jobs = [
+        (name, cats, _build_specialist_messages(inputs, name, cats))
+        for name, cats in SPECIALISTS
+    ]
+    outcomes: list[SpecialistOutcome] = []
+    failed: list[str] = []
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="mentora-spec") as pool:
+        futures = {
+            pool.submit(
+                _specialist_pass, app, run_id, name, cats, messages,
+                source, chat_client, model, effort,
+            ): name
+            for name, cats, messages in specialist_jobs
+        }
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                outcomes.append(future.result())
+            except Exception as exc:
+                failed.append(name)
+                log_event(
+                    run_id, "specialist_failed", f"{name} failed: {exc}",
+                    status="error", payload={"specialist": name},
+                )
+    if not outcomes:
+        raise RuntimeError("all specialists failed")
+    gaps = _merge_gaps(outcomes)
+    merge_payload: dict[str, Any] = {
+        "field": "", "level": "", "core_problem": "",
+        "what_student_already_tried": [], "questions_for_professor": [],
+        "expertise_keywords": [], "confidence": 0.0,
+    }
+    try:
+        recording = _UsageRecorder(chat_client)
+        started = time.perf_counter()
+        merge_payload = complete_json(
+            recording,
+            [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": (
+                        "MERGE PASS: write the summary fields for these "
+                        f"candidate gaps (JSON data, already deduped).\n"
+                        f"{DOC_BEGIN}\n{json_dumps(gaps)}\n{DOC_END}\n"
+                        f"Student problem:\n{DOC_BEGIN}\n{inputs.problem_text}\n{DOC_END}"
+                    ),
+                },
+            ],
+            model=model, schema=MERGE_SCHEMA, name="DiagnosisMerge", effort=effort,
+        )
+        merge_latency = time.perf_counter() - started
+        merge_usage = recording.results[-1].usage if recording.results else None
+        log_event(
+            run_id, "merge_finished",
+            f"Merge finished in {merge_latency:.1f}s ({len(gaps)} gaps)",
+            payload={
+                "latency_s": round(merge_latency, 2), "usage": merge_usage or {},
+                "gaps": len(gaps),
+            },
+        )
+    except Exception as exc:
+        log_event(
+            run_id, "merge_failed", f"Merge failed ({exc}); keeping raw gaps",
+            status="error",
+        )
+    checked = sum(outcome.checked for outcome in outcomes)
+    dropped = sum(outcome.dropped for outcome in outcomes)
+    rate = (checked - dropped) / checked if checked else 1.0
+    log_event(
+        run_id, "grounding_checked",
+        f"Grounding check: {rate:.0%} ({checked - dropped}/{checked})",
+        payload={"rate": rate, "checked": checked, "dropped": dropped},
+    )
+    merged = coerce_diagnosis({**merge_payload, "gaps": gaps})
+    merged["partial"] = bool(failed)
+    merged["failed_specialists"] = sorted(failed)
+    case.diagnosis = merged
+    case.grounding_rate = rate
+    case.status = "done"
+    db.session.commit()
+
+
+def json_dumps(payload: Any) -> str:
+    """Compact JSON for model prompts."""
+    return json.dumps(payload, ensure_ascii=True)
+
+
+def _run_pipeline(
+    case: CaseFile,
+    run_id: str,
+    chat_client: ChatClient | None,
+    model: str | None,
+    effort: str | None,
+) -> None:
+    """Pipeline body; raises on failure so the caller can mark the case."""
+    inputs = _prepare_inputs(case, run_id)
+    problem_text = inputs.problem_text
+    extracted = inputs.extracted
+    native_pdf = inputs.native_pdf
 
     if chat_client is None or model is None:
         settings = MetaSettings.from_env()

@@ -39,6 +39,7 @@
 <div class="grid items-start gap-6 lg:grid-cols-5">
   <div class="lg:col-span-3">
     <h2 class="mb-4 font-display text-xl font-semibold tracking-tight">Diagnosis</h2>
+    <div id="provisional-gaps" class="mb-4 hidden space-y-4" aria-live="polite" aria-label="Gaps found so far"></div>
     {% if case.status == "done" and case.diagnosis %}
       {% set d = case.diagnosis %}
       <div class="space-y-4">
@@ -144,6 +145,7 @@
   (function () {
     var list = document.getElementById('timeline');
     var note = document.getElementById('timeline-note');
+    var provisional = document.getElementById('provisional-gaps');
     var skeletons = document.getElementById('skeletons');
     var elapsed = document.getElementById('elapsed');
     var after = parseInt(list.getAttribute('data-after') || '0', 10);
@@ -180,6 +182,26 @@
       li.appendChild(wrap);
       return li;
     }
+    function gapCard(gap) {
+      var card = document.createElement('div');
+      card.className = 'rounded-2xl border border-border bg-card px-6 py-5 shadow-sm';
+      var head = document.createElement('div');
+      head.className = 'flex flex-wrap items-center justify-between gap-2';
+      var cat = document.createElement('span');
+      cat.className = 'inline-block rounded-full border border-brand/30 bg-brand-tint px-2.5 py-0.5 text-xs font-semibold text-brand';
+      cat.textContent = gap.category || 'other';
+      var sev = document.createElement('span');
+      sev.className = 'text-xs font-medium text-muted';
+      sev.textContent = 'severity ' + (gap.severity || 1) + '/3';
+      head.appendChild(cat);
+      head.appendChild(sev);
+      var desc = document.createElement('p');
+      desc.className = 'mt-3 text-sm leading-relaxed';
+      desc.textContent = gap.description || '';
+      card.appendChild(head);
+      card.appendChild(desc);
+      return card;
+    }
     function poll() {
       fetch(url + '?after=' + after, {headers: {'Accept': 'application/json'}})
         .then(function (r) { return r.json(); })
@@ -190,6 +212,12 @@
               list.setAttribute('data-started', startedAt);
             }
             list.appendChild(row(ev.status, ev.label, ev.created_at));
+            if (ev.type === 'specialist_done' && ev.payload && ev.payload.gaps && provisional) {
+              provisional.classList.remove('hidden');
+              ev.payload.gaps.forEach(function (gap) {
+                provisional.appendChild(gapCard(gap));
+              });
+            }
             if (ev.seq > after) { after = ev.seq; }
           });
           if (after > 0 && skeletons) { skeletons.classList.add('hidden'); }

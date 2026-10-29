@@ -291,6 +291,7 @@ def _seed_case_with_pdf(app: Flask, tmp_path, pdf_data: bytes) -> CaseFile:  # t
 
 def test_pipeline_completes_and_writes_events(app: Flask, tmp_path) -> None:  # type: ignore[no-untyped-def]
     """Fake-client run persists diagnosis, rate and an ordered timeline."""
+    app.config["DIAGNOSIS_MODE"] = "single"
     case = _seed_case_with_pdf(app, tmp_path, pdf_bytes(PDF_PAGES))
     fake = CannedJsonClient(canned_diagnosis())
     run_case_pipeline(app, case.id, "run-test-1", chat_client=fake, model="fake-model")
@@ -312,6 +313,7 @@ def test_pipeline_completes_and_writes_events(app: Flask, tmp_path) -> None:  # 
 
 def test_pipeline_falls_back_to_native_pdf(app: Flask, tmp_path) -> None:  # type: ignore[no-untyped-def]
     """A scanned PDF is sent natively and the decision is logged as an event."""
+    app.config["DIAGNOSIS_MODE"] = "single"
     case = _seed_case_with_pdf(app, tmp_path, pdf_bytes([[""]]))
     fake = CannedJsonClient({**canned_diagnosis(), "gaps": []})
     run_case_pipeline(app, case.id, "run-test-1", chat_client=fake, model="fake-model")
@@ -333,6 +335,7 @@ def test_pipeline_falls_back_to_native_pdf(app: Flask, tmp_path) -> None:  # typ
 
 def test_pipeline_marks_case_error_on_model_failure(app: Flask, tmp_path) -> None:  # type: ignore[no-untyped-def]
     """Model exceptions become run_failed events, not raised errors."""
+    app.config["DIAGNOSIS_MODE"] = "single"
     case = _seed_case_with_pdf(app, tmp_path, pdf_bytes(PDF_PAGES))
 
     class ExplodingClient(CannedJsonClient):

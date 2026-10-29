@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import uuid
+from datetime import datetime
 from typing import Any
 
 from flask import (
@@ -42,7 +43,24 @@ def dashboard() -> str:
         .order_by(CaseFile.created_at.desc())
         .all()
     )
-    return render_template("cases/dashboard.html", cases=cases)
+    open_count = CaseFile.query.filter(
+        CaseFile.student_id == user.id,
+        CaseFile.status.in_(["pending", "running"]),
+    ).count()
+    done_count = CaseFile.query.filter_by(
+        student_id=user.id, status="done"
+    ).count()
+    hour = datetime.now().hour
+    greeting = (
+        "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
+    )
+    return render_template(
+        "cases/dashboard.html",
+        cases=cases,
+        greeting=greeting,
+        open_count=open_count,
+        done_count=done_count,
+    )
 
 
 @bp.get("/cases/new")

@@ -1,40 +1,91 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Mentora{% endblock %}</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <title>{% block title %}Mentora Academic Hub{% endblock %}</title>
+  {% include "_head.html" %}
 </head>
-<body class="bg-white text-slate-900 antialiased">
-{% from "_ui.html" import flash_messages %}
-  <header class="border-b border-slate-200">
-    <nav class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-      <a href="{{ url_for('index') }}" class="text-lg font-semibold tracking-tight">Mentora</a>
-      <div class="flex items-center gap-4 text-sm">
-        {% if current_user %}
-          {% if current_user.role == "student" %}
-            <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Dashboard</a>
-          {% endif %}
-          <span class="text-slate-600">{{ current_user.display_name }} &middot; {{ current_user.role }}</span>
-          <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Log out</button>
-          </form>
-        {% else %}
-          <a href="{{ url_for('auth.login') }}" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Log in</a>
-          <a href="{{ url_for('auth.register') }}" class="rounded-md bg-teal-800 px-3 py-1.5 font-medium text-white hover:bg-teal-700">Register</a>
+<body class="min-h-screen bg-paper font-sans text-ink antialiased">
+{% from "_ui.html" import flash_messages, logo_mark, icon %}
+<header class="sticky top-0 z-40 border-b border-border bg-paper/90 backdrop-blur">
+  <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3" aria-label="Main">
+    <a href="{{ url_for('index') }}" class="flex items-center gap-2.5">
+      {{ logo_mark(32) }}
+      <span class="font-display text-lg font-semibold tracking-tight">Mentora Academic Hub</span>
+    </a>
+    <div class="hidden items-center gap-5 text-sm md:flex">
+      {% if current_user %}
+        {% if current_user.role == "student" %}
+          <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
+          <a href="{{ url_for('cases.new_form') }}" class="font-medium text-muted hover:text-ink">New request</a>
         {% endif %}
-      </div>
-    </nav>
-  </header>
-  <main class="{% block main_class %}mx-auto max-w-3xl px-4 py-8{% endblock %}">
-    {{ flash_messages() }}
-    {% block content %}{% endblock %}
-  </main>
-  <script>
-    // Vanilla JS entry point; per-page scripts plug in via the scripts block.
-  </script>
-  {% block scripts %}{% endblock %}
+        <details class="user-menu relative">
+          <summary class="flex items-center gap-2 rounded-lg px-1 py-1" aria-label="Account menu">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-semibold text-white" aria-hidden="true">{{ current_user.display_name[0]|upper }}</span>
+            <span class="max-w-32 truncate text-muted">{{ current_user.display_name }}</span>
+          </summary>
+          <div class="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-md">
+            <p class="px-3 py-1.5 text-xs text-muted">{{ current_user.role|capitalize }} account</p>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-paper">Log out</button>
+            </form>
+          </div>
+        </details>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="font-medium text-muted hover:text-ink">Log in</a>
+        <a href="{{ url_for('auth.register') }}" class="rounded-lg bg-brand px-4 py-2 font-semibold text-white hover:bg-brand-hover">Register</a>
+      {% endif %}
+    </div>
+    <button type="button" id="nav-toggle" class="rounded-lg p-2 text-ink hover:bg-border/50 md:hidden" aria-expanded="false" aria-controls="nav-mobile" aria-label="Toggle navigation">
+      {{ icon("menu", "h-6 w-6") }}
+    </button>
+  </nav>
+  <div id="nav-mobile" class="hidden border-t border-border px-4 py-3 md:hidden">
+    <div class="flex flex-col gap-3 text-sm font-medium">
+      {% if current_user %}
+        {% if current_user.role == "student" %}
+          <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
+          <a href="{{ url_for('cases.new_form') }}" class="py-1">New request</a>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.logout') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="py-1 text-left">Log out ({{ current_user.display_name }})</button>
+        </form>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="py-1">Log in</a>
+        <a href="{{ url_for('auth.register') }}" class="py-1">Register</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+<main class="{% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}">
+  {{ flash_messages() }}
+  {% block content %}{% endblock %}
+</main>
+<footer class="mt-16 border-t border-border">
+  <div class="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted md:flex-row md:items-center md:justify-between">
+    <p class="flex items-center gap-2">{{ logo_mark(20) }}<span class="font-semibold text-ink">Mentora Academic Hub</span></p>
+    <p>Built during the Meta Global AI Developer Hackathon 2026. Demo accounts and data are synthetic.</p>
+  </div>
+</footer>
+<script>
+  (function () {
+    var toggle = document.getElementById('nav-toggle');
+    var menu = document.getElementById('nav-mobile');
+    if (toggle && menu) {
+      toggle.addEventListener('click', function () {
+        var open = menu.classList.toggle('hidden');
+        toggle.setAttribute('aria-expanded', open ? 'false' : 'true');
+      });
+    }
+    document.querySelectorAll('[data-toast]').forEach(function (toast) {
+      var close = toast.querySelector('[data-toast-close]');
+      var dismiss = function () { toast.remove(); };
+      if (close) { close.addEventListener('click', dismiss); }
+      window.setTimeout(function () { if (toast.isConnected) { dismiss(); } }, 6000);
+    });
+  })();
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,20 +1,32 @@
 {% extends "base.html" %}
-{% from "_ui.html" import card, button, badge, section_header, empty_state %}
-{% block title %}Dashboard &middot; Mentora{% endblock %}
+{% from "_ui.html" import card, button, badge, section_header, empty_state, stat_card, icon %}
+{% block title %}Dashboard · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
-{{ section_header("Your cases", "Intake requests and their diagnoses.") }}
-<div class="mb-5">{{ button("New request", href=url_for("cases.new_form")) }}</div>
+{{ section_header(greeting + ", " + current_user.display_name.split()[0] + ".", "Your intake requests and their diagnoses.") }}
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {{ stat_card("Open cases", open_count, "clock") }}
+  {{ stat_card("Completed diagnoses", done_count, "check") }}
+  <a href="{{ url_for('cases.new_form') }}" class="flex items-center justify-between rounded-2xl bg-brand px-5 py-4 text-white shadow-sm hover:bg-brand-hover">
+    <span>
+      <span class="block text-sm font-medium text-white/85">Start a diagnosis</span>
+      <span class="mt-0.5 block font-display text-xl font-semibold">New request</span>
+    </span>
+    {{ icon("plus", "h-7 w-7") }}
+  </a>
+</div>
+<h2 class="mb-4 mt-10 font-display text-xl font-semibold tracking-tight">Recent cases</h2>
 {% if cases %}
-  <ul class="space-y-3">
+  <ul class="grid gap-4 md:grid-cols-2">
     {% for case in cases %}
       {% set tone = {"done": "ok", "running": "info", "error": "bad"}.get(case.status, "neutral") %}
       <li>
         {% call card() %}
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
-              <a href="{{ url_for('cases.detail', case_id=case.id) }}" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Case #{{ case.id }}</a>
-              <p class="mt-1 truncate text-sm text-slate-600">{{ case.problem_text or "(no problem text)" }}</p>
-              <p class="mt-1 text-xs text-slate-500">{{ case.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</p>
+              <a href="{{ url_for('cases.detail', case_id=case.id) }}" class="font-display text-lg font-semibold hover:text-brand">Case #{{ case.id }}</a>
+              <p class="mt-1 line-clamp-2 text-sm text-muted">{{ case.problem_text or "(no problem text)" }}</p>
+              <p class="mt-2 text-xs text-muted">{{ case.created_at.strftime("%Y-%m-%d %H:%M") }} UTC</p>
             </div>
             <div class="shrink-0">{{ badge(case.status, tone=tone) }}</div>
           </div>
@@ -23,6 +35,6 @@
     {% endfor %}
   </ul>
 {% else %}
-  {{ empty_state("No cases yet", "Describe your thesis or coursework problem and the agent will diagnose the real gap.", action_href=url_for("cases.new_form"), action_label="New request") }}
+  {{ empty_state("No cases yet", "Describe your thesis or coursework problem and the agent will diagnose the real gap, quoting your own pages.", action_href=url_for("cases.new_form"), action_label="New request", icon_name="search") }}
 {% endif %}
 {% endblock %}

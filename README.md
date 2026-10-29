@@ -103,6 +103,12 @@ Log in as a seeded student (any `sample-student-0X@example.com` address with
 timeline on the right as each real step completes, then the diagnosis with
 grounded evidence quotes on the left.
 
+## Design credits
+
+Headings are set in Fraunces and UI text in Inter (Google Fonts, SIL OFL).
+All icons are original inline SVGs drawn for this project in the Lucide/Feather
+stroke style (ISC-licensed references); the logo mark is original artwork.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

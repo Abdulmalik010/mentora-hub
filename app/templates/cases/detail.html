@@ -1,24 +1,49 @@
 {% extends "base.html" %}
-{% from "_ui.html" import card, button, badge, section_header, empty_state %}
-{% block title %}Case #{{ case.id }} &middot; Mentora{% endblock %}
-{% block main_class %}mx-auto max-w-6xl px-4 py-8{% endblock %}
+{% from "_ui.html" import card, button, badge, icon, empty_state %}
+{% block title %}Case #{{ case.id }} · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
 {% set tone = {"done": "ok", "running": "info", "error": "bad"}.get(case.status, "neutral") %}
-<div class="mb-5 flex items-start justify-between gap-4">
-  <div>
-    <h1 class="text-xl font-bold tracking-tight">Case #{{ case.id }}</h1>
-    <p class="mt-1 max-w-2xl text-sm text-slate-600">{{ case.problem_text }}</p>
+{% set types = events | map(attribute="type") | list %}
+{% set ns = namespace(step=1) %}
+{% if "text_extracted" in types or "native_pdf_fallback" in types %}{% set ns.step = 3 %}{% elif types %}{% set ns.step = 2 %}{% endif %}
+{% if "diagnosis_finished" in types %}{% set ns.step = 4 %}{% elif "diagnosis_started" in types %}{% set ns.step = 3 %}{% endif %}
+<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+  <div class="min-w-0">
+    <p class="text-sm font-semibold text-brand"><a href="{{ url_for('cases.dashboard') }}" class="hover:text-brand-hover">← All cases</a></p>
+    <h1 class="mt-1 font-display text-2xl font-semibold tracking-tight">Case #{{ case.id }}</h1>
+    <p class="mt-1 max-w-2xl text-sm text-muted">{{ case.problem_text }}</p>
   </div>
   <div class="shrink-0 pt-1">{{ badge(case.status, tone=tone) }}</div>
 </div>
-<div class="grid gap-6 md:grid-cols-2">
-  <div>
-    {{ section_header("Diagnosis") }}
+
+<ol class="mb-8 grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Case progress">
+  {% for label in ["Received", "Reading document", "Diagnosing", "Verified"] %}
+    {% set i = loop.index %}
+    <li class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm
+        {% if case.status == 'error' and i == ns.step %}border-danger/30 bg-danger/10
+        {% elif i < ns.step or case.status == 'done' %}border-success/30 bg-success/10
+        {% elif i == ns.step %}border-brand/40 bg-brand-tint
+        {% else %}border-border bg-card{% endif %}">
+      <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold
+          {% if i < ns.step or case.status == 'done' %}bg-success text-white
+          {% elif i == ns.step %}bg-brand text-white
+          {% else %}bg-border text-muted{% endif %}">
+        {% if i < ns.step or case.status == 'done' %}✓{% else %}{{ i }}{% endif %}
+      </span>
+      <span class="font-medium">{{ label }}</span>
+    </li>
+  {% endfor %}
+</ol>
+
+<div class="grid items-start gap-6 lg:grid-cols-5">
+  <div class="lg:col-span-3">
+    <h2 class="mb-4 font-display text-xl font-semibold tracking-tight">Diagnosis</h2>
     {% if case.status == "done" and case.diagnosis %}
       {% set d = case.diagnosis %}
       <div class="space-y-4">
-        {% call card() %}
-          <div class="flex flex-wrap gap-2">
+        {% call card("Summary") %}
+          <div class="mt-3 flex flex-wrap gap-2">
             {{ badge(d.get("field", "?"), tone="info") }}
             {{ badge(d.get("level", "?")) }}
             {{ badge("confidence %.0f%%" % ((d.get("confidence") or 0) * 100)) }}
@@ -30,27 +55,31 @@
         {% endcall %}
         {% for gap in d.get("gaps", []) %}
           {% call card() %}
-            <div class="flex items-center justify-between gap-3">
-              {{ badge(gap.get("category", "other"), tone="info") }}
-              {{ badge("severity %d/3" % gap.get("severity", 1), tone="warn" if gap.get("severity", 1) >= 2 else "neutral") }}
-            </div>
-            <p class="mt-2 text-sm leading-relaxed">{{ gap.get("description", "") }}</p>
-            {% if gap.get("evidence") %}
-              <ul class="mt-3 space-y-2 border-t border-slate-100 pt-3">
-                {% for ev in gap.get("evidence", []) %}
-                  <li class="text-sm">
-                    <span class="text-xs font-medium text-slate-500">[page {{ ev.get("page", "?") }}]</span>
-                    <span class="text-slate-700">&ldquo;{{ ev.get("quote", "") }}&rdquo;</span>
-                  </li>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              {{ badge(gap.get("category", "other"), tone="brand") }}
+              <span class="flex items-center gap-1" role="img" aria-label="Severity {{ gap.get('severity', 1) }} out of 3">
+                {% for dot in [1, 2, 3] %}
+                  <span class="h-2.5 w-2.5 rounded-full {{ 'bg-warning' if dot <= (gap.get('severity', 1)) else 'bg-border' }}"></span>
                 {% endfor %}
-              </ul>
+                <span class="ml-1 text-xs font-medium text-muted">severity {{ gap.get("severity", 1) }}/3</span>
+              </span>
+            </div>
+            <p class="mt-3 text-sm leading-relaxed">{{ gap.get("description", "") }}</p>
+            {% if gap.get("evidence") %}
+              <div class="mt-3 space-y-2">
+                {% for ev in gap.get("evidence", []) %}
+                  <blockquote class="rounded-lg border-l-4 border-gold bg-paper px-4 py-2.5 text-sm">
+                    <p class="text-ink">“{{ ev.get("quote", "") }}”</p>
+                    <p class="mt-1">{{ badge("page " ~ ev.get("page", "?")) }}</p>
+                  </blockquote>
+                {% endfor %}
+              </div>
             {% endif %}
           {% endcall %}
         {% endfor %}
         {% if d.get("what_student_already_tried") %}
-          {% call card() %}
-            <h2 class="text-sm font-semibold">Already tried</h2>
-            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+          {% call card("Already tried") %}
+            <ul class="mt-3 list-disc space-y-1.5 pl-5 text-sm text-muted">
               {% for item in d.get("what_student_already_tried", []) %}
                 <li>{{ item }}</li>
               {% endfor %}
@@ -58,11 +87,10 @@
           {% endcall %}
         {% endif %}
         {% if d.get("questions_for_professor") %}
-          {% call card() %}
-            <h2 class="text-sm font-semibold">Questions for a professor</h2>
-            <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+          {% call card("Questions for your professor") %}
+            <ul class="mt-3 space-y-2.5">
               {% for item in d.get("questions_for_professor", []) %}
-                <li>{{ item }}</li>
+                <li class="flex gap-2.5 text-sm"><span class="font-display font-semibold text-gold">Q{{ loop.index }}.</span><span>{{ item }}</span></li>
               {% endfor %}
             </ul>
           {% endcall %}
@@ -76,23 +104,35 @@
         {% endif %}
       </div>
     {% elif case.status == "error" %}
-      {{ empty_state("Diagnosis failed", "The run hit an error; the timeline on the right shows what happened.") }}
+      {{ empty_state("Diagnosis failed", "The run hit an error. The timeline shows how far it got before stopping.", icon_name="alert") }}
     {% else %}
-      {{ empty_state("Diagnosis running", "The agent is working through your request. Steps appear in the timeline as they complete.") }}
+      {{ empty_state("Diagnosis running", "The agent is working through your request. Steps appear in the timeline as they complete.", icon_name="clock") }}
     {% endif %}
   </div>
-  <div>
-    {{ section_header("Agent timeline") }}
+
+  <div class="lg:col-span-2 lg:sticky lg:top-20">
+    <div class="mb-4 flex items-baseline justify-between">
+      <h2 class="font-display text-xl font-semibold tracking-tight">Agent timeline</h2>
+      <p id="elapsed" class="text-xs tabular-nums text-muted"></p>
+    </div>
     {% call card() %}
-      <ol id="timeline" class="space-y-3" data-after="{{ events[-1].seq if events else 0 }}">
+      <ol id="timeline" class="space-y-1" aria-live="polite" data-after="{{ events[-1].seq if events else 0 }}"
+          {% if events %}data-started="{{ events[0].created_at.isoformat() }}"{% endif %}>
         {% for event in events %}
-          <li class="flex gap-3 text-sm" data-seq="{{ event.seq }}">
-            <span class="mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-red-500' if event.status == 'error' else 'bg-teal-700' }}"></span>
-            <span>{{ event.label }}</span>
+          <li class="flex gap-3 rounded-lg px-2 py-2 text-sm" data-seq="{{ event.seq }}">
+            <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-danger' if event.status == 'error' else 'bg-brand' }}"></span>
+            <span class="min-w-0">
+              <span class="block font-medium">{{ event.label }}</span>
+              <span class="block text-xs tabular-nums text-muted">{{ event.created_at.strftime("%H:%M:%S") }}</span>
+            </span>
           </li>
         {% endfor %}
       </ol>
-      <p id="timeline-note" class="mt-3 text-xs text-slate-500">
+      <div id="skeletons" class="space-y-3 px-2 py-2 {% if case.status in ('done', 'error') or events %}hidden{% endif %}" aria-hidden="true">
+        <div class="skeleton h-4 w-3/4 rounded"></div>
+        <div class="skeleton h-4 w-1/2 rounded"></div>
+      </div>
+      <p id="timeline-note" class="mt-2 border-t border-border px-2 pt-3 text-xs text-muted">
         {% if case.status in ("done", "error") %}Run finished.{% else %}Live: updating every second.{% endif %}
       </p>
     {% endcall %}
@@ -104,30 +144,58 @@
   (function () {
     var list = document.getElementById('timeline');
     var note = document.getElementById('timeline-note');
+    var skeletons = document.getElementById('skeletons');
+    var elapsed = document.getElementById('elapsed');
     var after = parseInt(list.getAttribute('data-after') || '0', 10);
+    var startedAt = list.getAttribute('data-started');
     var url = window.location.pathname + '/events';
-    function dot(status) {
-      var s = document.createElement('span');
-      s.className = 'mt-0.5 inline-block h-2.5 w-2.5 shrink-0 rounded-full '
-        + (status === 'error' ? 'bg-red-500' : 'bg-teal-700');
-      return s;
+
+    function fmtTime(iso) {
+      var d = new Date(iso);
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+    function tick() {
+      if (!startedAt) { return; }
+      var s = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000));
+      elapsed.textContent = 'elapsed ' + Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+    }
+    function row(status, label, iso) {
+      var li = document.createElement('li');
+      li.className = 'flex gap-3 rounded-lg px-2 py-2 text-sm';
+      var dot = document.createElement('span');
+      dot.className = 'mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full '
+        + (status === 'error' ? 'bg-danger' : status === 'running' ? 'bg-brand timeline-dot-running' : 'bg-brand');
+      var wrap = document.createElement('span');
+      wrap.className = 'min-w-0';
+      var title = document.createElement('span');
+      title.className = 'block font-medium';
+      title.textContent = label;
+      var time = document.createElement('span');
+      time.className = 'block text-xs tabular-nums text-muted';
+      time.textContent = fmtTime(iso);
+      wrap.appendChild(title);
+      wrap.appendChild(time);
+      li.appendChild(dot);
+      li.appendChild(wrap);
+      return li;
     }
     function poll() {
       fetch(url + '?after=' + after, {headers: {'Accept': 'application/json'}})
         .then(function (r) { return r.json(); })
         .then(function (data) {
           (data.events || []).forEach(function (ev) {
-            var li = document.createElement('li');
-            li.className = 'flex gap-3 text-sm';
-            li.appendChild(dot(ev.status));
-            var label = document.createElement('span');
-            label.textContent = ev.label;
-            li.appendChild(label);
-            list.appendChild(li);
+            if (!startedAt) {
+              startedAt = ev.created_at;
+              list.setAttribute('data-started', startedAt);
+            }
+            list.appendChild(row(ev.status, ev.label, ev.created_at));
             if (ev.seq > after) { after = ev.seq; }
           });
+          if (after > 0 && skeletons) { skeletons.classList.add('hidden'); }
+          tick();
           if (data.status === 'done' || data.status === 'error') {
-            note.textContent = 'Run finished. Reloading\u2026';
+            note.textContent = 'Run finished. Reloading…';
             window.location.reload();
           } else {
             window.setTimeout(poll, 1000);
@@ -135,6 +203,8 @@
         })
         .catch(function () { window.setTimeout(poll, 3000); });
     }
+    tick();
+    window.setInterval(tick, 1000);
     {% if case.status not in ("done", "error") %}
     window.setTimeout(poll, 1000);
     {% endif %}

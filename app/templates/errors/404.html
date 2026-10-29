@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% from "_ui.html" import button, empty_state %}
+{% block title %}Not found · Mentora Academic Hub{% endblock %}
+{% block content %}
+{{ empty_state("Page not found", "That address does not exist or you do not have access to it.", icon_name="search") }}
+<div class="mt-5 text-center">{{ button("Back to home", href=url_for("index")) }}</div>
+{% endblock %}

@@ -1,64 +1,84 @@
 {% extends "base.html" %}
-{% block title %}Register &middot; Mentora{% endblock %}
+{% from "_ui.html" import button, logo_mark, icon %}
+{% block title %}Register · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-5xl px-4 py-10{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold tracking-tight">Create your account</h1>
-<form method="post" action="{{ url_for('auth.register') }}" class="mt-5 max-w-md space-y-4">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <div>
-    <label for="display_name" class="block text-sm font-medium">Display name</label>
-    <input id="display_name" name="display_name" type="text" required value="{{ request.form.get('display_name', '') }}"
-      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+<div class="grid gap-8 md:grid-cols-2">
+  <div class="hidden rounded-2xl bg-ink p-8 text-white md:block">
+    <div class="flex items-center gap-2.5">
+      {{ logo_mark(32) }}
+      <span class="font-display text-lg font-semibold">Mentora Academic Hub</span>
+    </div>
+    <h1 class="mt-8 font-display text-3xl font-semibold leading-tight">One account for diagnosis, matching and notes.</h1>
+    <ul class="mt-6 space-y-4 text-sm text-white/85">
+      <li class="flex gap-3"><span class="text-gold">{{ icon("check", "h-5 w-5 shrink-0") }}</span>Students submit problems and track every agent step.</li>
+      <li class="flex gap-3"><span class="text-gold">{{ icon("check", "h-5 w-5 shrink-0") }}</span>Professors receive briefs with cited evidence.</li>
+      <li class="flex gap-3"><span class="text-gold">{{ icon("check", "h-5 w-5 shrink-0") }}</span>Demo data is synthetic and clearly labeled.</li>
+    </ul>
   </div>
-  <div>
-    <label for="email" class="block text-sm font-medium">Email</label>
-    <input id="email" name="email" type="email" required value="{{ request.form.get('email', '') }}"
-      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  <div class="rounded-2xl border border-border bg-card p-8 shadow-sm">
+    <h1 class="font-display text-2xl font-semibold tracking-tight">Create your account</h1>
+    <p class="mt-1 text-sm text-muted">Join Mentora Academic Hub in under a minute.</p>
+    <form method="post" action="{{ url_for('auth.register') }}" class="mt-6 space-y-4" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label for="display_name" class="block text-sm font-medium">Display name</label>
+        <input id="display_name" name="display_name" type="text" required autocomplete="name" value="{{ request.form.get('display_name', '') }}"
+          class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm user-invalid:border-danger">
+      </div>
+      <div>
+        <label for="email" class="block text-sm font-medium">Email</label>
+        <input id="email" name="email" type="email" required autocomplete="email" value="{{ request.form.get('email', '') }}"
+          class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm user-invalid:border-danger">
+      </div>
+      <div>
+        <label for="password" class="block text-sm font-medium">Password</label>
+        <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password"
+          class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm user-invalid:border-danger" aria-describedby="password-hint">
+        <p id="password-hint" class="mt-1 text-xs text-muted">At least 8 characters.</p>
+      </div>
+      <fieldset>
+        <legend class="text-sm font-medium">I am a</legend>
+        <div class="mt-2 flex gap-5 text-sm">
+          {% for role in roles %}
+            <label class="flex items-center gap-2">
+              <input type="radio" name="role" value="{{ role }}" required class="h-4 w-4 accent-brand"
+                {% if request.form.get('role', 'student') == role %}checked{% endif %}>
+              {{ role|capitalize }}
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <fieldset id="student-fields" class="space-y-4">
+        <div>
+          <label for="level" class="block text-sm font-medium">Level</label>
+          <select id="level" name="level" class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm">
+            {% for level in levels %}
+              <option value="{{ level }}" {% if request.form.get('level') == level %}selected{% endif %}>{{ level|capitalize }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="field" class="block text-sm font-medium">Field of study</label>
+          <input id="field" name="field" type="text" value="{{ request.form.get('field', '') }}"
+            class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm">
+        </div>
+      </fieldset>
+      <fieldset id="professor-fields" class="space-y-4">
+        <div>
+          <label for="department" class="block text-sm font-medium">Department</label>
+          <select id="department" name="department" class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm">
+            {% for dept in departments %}
+              <option value="{{ dept }}" {% if request.form.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </fieldset>
+      <div class="pt-1">{{ button("Register") }}</div>
+      <p class="text-sm text-muted">Already have an account? <a href="{{ url_for('auth.login') }}" class="font-semibold text-brand hover:text-brand-hover">Log in</a>.</p>
+    </form>
   </div>
-  <div>
-    <label for="password" class="block text-sm font-medium">Password (min 8 characters)</label>
-    <input id="password" name="password" type="password" required minlength="8"
-      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-  </div>
-  <fieldset>
-    <legend class="text-sm font-medium">I am a</legend>
-    <div class="mt-1 flex gap-4 text-sm">
-      {% for role in roles %}
-        <label class="flex items-center gap-1.5">
-          <input type="radio" name="role" value="{{ role }}" required
-            {% if request.form.get('role', 'student') == role %}checked{% endif %}>
-          {{ role|capitalize }}
-        </label>
-      {% endfor %}
-    </div>
-  </fieldset>
-  <fieldset id="student-fields" class="space-y-4">
-    <div>
-      <label for="level" class="block text-sm font-medium">Level</label>
-      <select id="level" name="level" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-        {% for level in levels %}
-          <option value="{{ level }}" {% if request.form.get('level') == level %}selected{% endif %}>{{ level|capitalize }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="field" class="block text-sm font-medium">Field of study</label>
-      <input id="field" name="field" type="text" value="{{ request.form.get('field', '') }}"
-        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-    </div>
-  </fieldset>
-  <fieldset id="professor-fields" class="space-y-4">
-    <div>
-      <label for="department" class="block text-sm font-medium">Department</label>
-      <select id="department" name="department" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-        {% for dept in departments %}
-          <option value="{{ dept }}" {% if request.form.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </fieldset>
-  <button type="submit" class="rounded-md bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Register</button>
-  <p class="text-sm text-slate-600">Already have an account? <a href="{{ url_for('auth.login') }}" class="font-medium text-teal-800 underline underline-offset-4">Log in</a>.</p>
-</form>
+</div>
 {% endblock %}
 {% block scripts %}
 <script>

@@ -1,0 +1,45 @@
+{# Shared <head> contents: tokens, fonts, favicon, base styles. #}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Mentora Academic Hub: an agent that diagnoses your thesis or coursework gap, matches you with the right professor, and turns sessions into notes.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='8' fill='%230E6B5C'/%3E%3Cpath d='M9 10c2.5-1.2 5-1.2 7 0 2-1.2 4.5-1.2 7 0v12c-2.5-1.2-5-1.2-7 0-2-1.2-4.5-1.2-7 0z' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M16 10v12' stroke='%23C9A227' stroke-width='2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@theme {
+  --color-ink: #0B1B33;
+  --color-brand: #0E6B5C;
+  --color-brand-hover: #0B574A;
+  --color-brand-tint: #ECF7F4;
+  --color-gold: #C9A227;
+  --color-paper: #FAF8F4;
+  --color-card: #FFFFFF;
+  --color-border: #E7E2D9;
+  --color-muted: #5B6475;
+  --color-success: #15803D;
+  --color-warning: #B45309;
+  --color-danger: #B42318;
+  --color-info: #2563EB;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+</style>
+<style>
+  body { background: #FAF8F4; color: #0B1B33; font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  :focus-visible { outline: 2px solid #0E6B5C; outline-offset: 2px; border-radius: 4px; }
+  .font-display { font-family: "Fraunces", Georgia, "Times New Roman", serif; }
+  .dot-grid { background-image: radial-gradient(#E7E2D9 1px, transparent 1px); background-size: 22px 22px; }
+  details.user-menu > summary { list-style: none; cursor: pointer; }
+  details.user-menu > summary::-webkit-details-marker { display: none; }
+  @keyframes pulse-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .timeline-dot-running { animation: pulse-soft 1.4s ease-in-out infinite; }
+  @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+  .skeleton { background: linear-gradient(90deg, #EDE9E0 25%, #F7F4EE 50%, #EDE9E0 75%); background-size: 800px 100%; animation: shimmer 1.6s linear infinite; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .toast { animation: toast-in 0.25s ease-out; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+</style>

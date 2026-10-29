@@ -1,21 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Log in &middot; Mentora{% endblock %}
+{% from "_ui.html" import button, logo_mark, icon %}
+{% block title %}Log in · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-5xl px-4 py-10{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold tracking-tight">Log in</h1>
-<form method="post" action="{{ url_for('auth.login') }}" class="mt-5 max-w-md space-y-4">
-  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-  <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-  <div>
-    <label for="email" class="block text-sm font-medium">Email</label>
-    <input id="email" name="email" type="email" required
-      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+<div class="grid gap-8 md:grid-cols-2">
+  <div class="hidden rounded-2xl bg-ink p-8 text-white md:block">
+    <div class="flex items-center gap-2.5">
+      {{ logo_mark(32) }}
+      <span class="font-display text-lg font-semibold">Mentora Academic Hub</span>
+    </div>
+    <h1 class="mt-8 font-display text-3xl font-semibold leading-tight">Pick up where your last session left off.</h1>
+    <ul class="mt-6 space-y-4 text-sm text-white/85">
+      <li class="flex gap-3"><span class="text-gold">{{ icon("check", "h-5 w-5 shrink-0") }}</span>Your cases keep their diagnoses, evidence and timelines.</li>
+      <li class="flex gap-3"><span class="text-gold">{{ icon("check", "h-5 w-5 shrink-0") }}</span>Professors see briefs grounded in your actual work.</li>
+      <li class="flex gap-3"><span class="text-gold">{{ icon("check", "h-5 w-5 shrink-0") }}</span>Session notes land in your inbox after every meeting.</li>
+    </ul>
   </div>
-  <div>
-    <label for="password" class="block text-sm font-medium">Password</label>
-    <input id="password" name="password" type="password" required
-      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  <div class="rounded-2xl border border-border bg-card p-8 shadow-sm">
+    <h1 class="font-display text-2xl font-semibold tracking-tight">Log in</h1>
+    <p class="mt-1 text-sm text-muted">Welcome back to Mentora Academic Hub.</p>
+    <form method="post" action="{{ url_for('auth.login') }}" class="mt-6 space-y-4" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+      <div>
+        <label for="email" class="block text-sm font-medium">Email</label>
+        <input id="email" name="email" type="email" required autocomplete="email"
+          class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm user-invalid:border-danger" aria-describedby="email-hint">
+        <p id="email-hint" class="mt-1 hidden text-xs text-danger user-invalid:block">Enter a valid email address.</p>
+      </div>
+      <div>
+        <label for="password" class="block text-sm font-medium">Password</label>
+        <input id="password" name="password" type="password" required autocomplete="current-password"
+          class="mt-1 w-full rounded-lg border border-border bg-paper px-3 py-2.5 text-sm user-invalid:border-danger">
+      </div>
+      <div class="pt-1">{{ button("Log in") }}</div>
+      <p class="text-sm text-muted">No account yet? <a href="{{ url_for('auth.register') }}" class="font-semibold text-brand hover:text-brand-hover">Register</a>.</p>
+    </form>
   </div>
-  <button type="submit" class="rounded-md bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Log in</button>
-  <p class="text-sm text-slate-600">No account yet? <a href="{{ url_for('auth.register') }}" class="font-medium text-teal-800 underline underline-offset-4">Register</a>.</p>
-</form>
+</div>
 {% endblock %}

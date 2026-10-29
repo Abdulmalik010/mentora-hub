@@ -38,3 +38,5 @@
 - 2026-10-29: Diagnosis uses META_MODEL_AGENT with structured output; the document is delimited data with an ignore-instructions guard against prompt injection.
 - 2026-10-29: samples/ holds two original synthetic excerpts with planted flaws plus expected.json as committed demo/test fixtures.
 - 2026-10-29: Diagnosis calls get a 180s timeout (live e2e: Wonder took 78s on a 2-page excerpt; the 60s default timed out 3/3); routine calls keep 60s.
+- 2026-10-29: Redesign tokens live once in templates/_head.html (Tailwind v4 @theme); original inline-SVG logo/icons plus favicon; Fraunces display + Inter UI.
+- 2026-10-29: Case stepper stages derive from real RunEvents and toasts render server-side (no-JS safe); error pages share the macro set.

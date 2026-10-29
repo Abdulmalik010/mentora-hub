@@ -176,9 +176,15 @@ def docx_bytes(paragraphs: list[str]) -> bytes:
     )
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", content_types)
-        archive.writestr("_rels/.rels", rels)
-        archive.writestr("word/document.xml", document)
+        # Fixed timestamps keep regeneration byte-stable.
+        for name, data in (
+            ("[Content_Types].xml", content_types),
+            ("_rels/.rels", rels),
+            ("word/document.xml", document),
+        ):
+            info = zipfile.ZipInfo(name, date_time=(2020, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, data)
     return buffer.getvalue()
 
 

@@ -58,11 +58,11 @@ class MetaSettings:
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> MetaSettings:
-        """Build settings from ``META_*`` variables; fail fast without a key."""
+        """Build settings from env; META_API_KEY preferred, MODEL_API_KEY fallback."""
         env = environ if environ is not None else os.environ
-        api_key = env.get("META_API_KEY", "")
+        api_key = env.get("META_API_KEY") or env.get("MODEL_API_KEY", "")
         if not api_key:
-            raise MetaClientError("META_API_KEY is not set")
+            raise MetaClientError("set META_API_KEY (preferred) or MODEL_API_KEY")
         return cls(
             api_key=api_key,
             base_url=env.get("META_BASE_URL") or DEFAULT_BASE_URL,
@@ -88,6 +88,7 @@ class ChatResult:
     text: str
     tool_calls: tuple[ToolCallRequest, ...] = ()
     raw_assistant_message: dict[str, Any] | None = None
+    usage: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -218,8 +219,12 @@ class OpenAICompatChatClient:
                 }
                 for call in message.tool_calls
             ]
+        usage = response.usage
         return ChatResult(
-            text=message.content or "", tool_calls=tuple(calls), raw_assistant_message=raw
+            text=message.content or "",
+            tool_calls=tuple(calls),
+            raw_assistant_message=raw,
+            usage=usage.model_dump() if usage is not None else None,
         )
 
 

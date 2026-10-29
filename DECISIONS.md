@@ -15,3 +15,16 @@
 - 2026-10-28: Seed data is synthetic, @example.com emails, is_sample=True, "[SAMPLE DATA]" bios; seed is idempotent get-or-create by email.
 - 2026-10-28: Email (Resend vs SMTP) and PDF (reportlab vs WeasyPrint) providers stay undecided; services are typed NotImplementedError stubs.
 - 2026-10-28: Verified on the machine's Python 3.14 while keeping the code 3.11-compatible; no 3.11 interpreter is installed here.
+- 2026-10-28: Pinned exact versions (Flask 3.1.3, Flask-SQLAlchemy 3.1.1, SQLAlchemy 2.1.6, Werkzeug 3.1.9, openai 3.40.0, python-dotenv 1.2.4, pytest 9.2.0) for reproducible builds.
+- 2026-10-28: API key reads META_API_KEY first, MODEL_API_KEY second (docs-verified name); fail fast when neither is set.
+- 2026-10-28: Session auth with Werkzeug hashes and no CSRF yet; Flask-WTF is mandatory before any shared deploy.
+- 2026-10-28: Passwords need 8+ chars at the app layer; NULL-hash rows (seed) can never log in.
+- 2026-10-28: Logout is POST-only; login honors relative next targets only (open-redirect guard); failures are generic to block enumeration.
+- 2026-10-28: Home page is a factory-level route so the blueprint structure stays exactly as specified.
+- 2026-10-28: Seed accounts share one env-provided demo password; seed refuses to run without SEED_DEMO_PASSWORD and reports sample rows only.
+- 2026-10-28: SECRET_KEY has no default and the factory fails fast without it outside TESTING; cookies are HttpOnly + SameSite=Lax with Secure via SESSION_COOKIE_SECURE.
+- 2026-10-28: Flask-WTF CSRFProtect guards every POST form including logout; pinned Flask-WTF 1.3.0.
+- 2026-10-28: httpx 0.28.1 pinned for the Meta transcribe multipart call.
+- 2026-10-28: Docs say native PDF input is a chat file block (base64 data URL + filename); DOCX is absent from the supported-MIME table so it needs the extracted-text path.
+- 2026-10-28: Docs say transcribe is multipart POST {base}/asr/transcribe (request JSON + audio WAV) with DIARIZATION speaker labels and turn-level timestamps only.
+- 2026-10-28: Live Meta check deferred by operator choice: check_meta validates (PDF xref ok, fail-fast ok) but made no live calls; run it before the intake step.

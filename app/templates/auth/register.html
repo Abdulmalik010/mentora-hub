@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Register &middot; Mentora{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold tracking-tight">Create your account</h1>
+<form method="post" action="{{ url_for('auth.register') }}" class="mt-5 max-w-md space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <label for="display_name" class="block text-sm font-medium">Display name</label>
+    <input id="display_name" name="display_name" type="text" required value="{{ request.form.get('display_name', '') }}"
+      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label for="email" class="block text-sm font-medium">Email</label>
+    <input id="email" name="email" type="email" required value="{{ request.form.get('email', '') }}"
+      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label for="password" class="block text-sm font-medium">Password (min 8 characters)</label>
+    <input id="password" name="password" type="password" required minlength="8"
+      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </div>
+  <fieldset>
+    <legend class="text-sm font-medium">I am a</legend>
+    <div class="mt-1 flex gap-4 text-sm">
+      {% for role in roles %}
+        <label class="flex items-center gap-1.5">
+          <input type="radio" name="role" value="{{ role }}" required
+            {% if request.form.get('role', 'student') == role %}checked{% endif %}>
+          {{ role|capitalize }}
+        </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <fieldset id="student-fields" class="space-y-4">
+    <div>
+      <label for="level" class="block text-sm font-medium">Level</label>
+      <select id="level" name="level" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+        {% for level in levels %}
+          <option value="{{ level }}" {% if request.form.get('level') == level %}selected{% endif %}>{{ level|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="field" class="block text-sm font-medium">Field of study</label>
+      <input id="field" name="field" type="text" value="{{ request.form.get('field', '') }}"
+        class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+    </div>
+  </fieldset>
+  <fieldset id="professor-fields" class="space-y-4">
+    <div>
+      <label for="department" class="block text-sm font-medium">Department</label>
+      <select id="department" name="department" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+        {% for dept in departments %}
+          <option value="{{ dept }}" {% if request.form.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </fieldset>
+  <button type="submit" class="rounded-md bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Register</button>
+  <p class="text-sm text-slate-600">Already have an account? <a href="{{ url_for('auth.login') }}" class="font-medium text-teal-800 underline underline-offset-4">Log in</a>.</p>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var student = document.getElementById('student-fields');
+    var professor = document.getElementById('professor-fields');
+    function toggle() {
+      var role = document.querySelector('input[name="role"]:checked');
+      var isStudent = !role || role.value === 'student';
+      student.style.display = isStudent ? '' : 'none';
+      professor.style.display = isStudent ? 'none' : '';
+    }
+    document.querySelectorAll('input[name="role"]').forEach(function (el) {
+      el.addEventListener('change', toggle);
+    });
+    toggle();
+  })();
+</script>
+{% endblock %}

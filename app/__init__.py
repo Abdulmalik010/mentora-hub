@@ -6,7 +6,7 @@ from typing import Any
 from flask import Flask
 
 from .config import Config
-from .extensions import db
+from .extensions import csrf, db
 
 
 def create_app(config_override: dict[str, Any] | None = None) -> Flask:
@@ -15,8 +15,11 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     app.config.from_object(Config)
     if config_override:
         app.config.update(config_override)
+    if not app.config.get("TESTING") and not app.config.get("SECRET_KEY"):
+        raise RuntimeError("SECRET_KEY must be set in the environment (see .env.example)")
 
     db.init_app(app)
+    csrf.init_app(app)
 
     from .blueprints.agent import bp as agent_bp
     from .blueprints.auth import bp as auth_bp
@@ -32,5 +35,19 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     def health() -> dict[str, str]:
         """App-level liveness probe (blueprints expose their own too)."""
         return {"status": "ok", "app": "mentora"}
+
+    @app.context_processor
+    def inject_user() -> dict[str, object]:
+        """Expose the session user to every template as ``current_user``."""
+        from .security import current_user
+
+        return {"current_user": current_user()}
+
+    @app.get("/")
+    def index() -> str:
+        """Home page (factory-level route; no extra blueprint for one page)."""
+        from flask import render_template
+
+        return render_template("index.html")
 
     return app

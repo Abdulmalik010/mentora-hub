@@ -1,14 +1,27 @@
 """Idempotent development seed: synthetic professors and students.
 
-Run from the project root: ``python -m scripts.seed``. Creates tables when
-missing. Every record is synthetic sample data (``is_sample=True``,
+Run from the project root: ``python -m scripts.seed`` (requires the
+``SEED_DEMO_PASSWORD`` env var). Creates tables when missing. Every record
+is synthetic sample data (``is_sample=True``,
 ``@example.com`` emails, ``[SAMPLE DATA]`` bios): no real names or photos.
 """
 from __future__ import annotations
 
+import os
+
 from app import create_app
 from app.extensions import db
 from app.models import ProfessorProfile, StudentProfile, User
+
+
+def _demo_password() -> str:
+    """Sample-only login password; seeding refuses to run without it."""
+    password = os.environ.get("SEED_DEMO_PASSWORD", "")
+    if not password:
+        raise RuntimeError(
+            "SEED_DEMO_PASSWORD must be set to seed (sample-only password; see README)"
+        )
+    return password
 
 DEPARTMENTS: tuple[str, ...] = (
     "Statistics",
@@ -67,9 +80,11 @@ def _get_or_create_user(email: str, **fields: object) -> tuple[User, bool]:
 def seed_database() -> dict[str, int]:
     """Seed 12 professors and 3 students; safe to run repeatedly.
 
-    Must run inside an app context. Existing rows (matched by email) are left
-    untouched, so re-runs change nothing.
+    Must run inside an app context. Existing rows (matched by email) keep
+    their data; only a missing password hash is backfilled, so re-runs are
+    otherwise no-ops.
     """
+    password = _demo_password()
     for i in range(1, 13):
         dept = DEPARTMENTS[(i - 1) // 3]
         areas = RESEARCH_AREAS[dept]
@@ -79,6 +94,8 @@ def seed_database() -> dict[str, int]:
             role="professor",
             is_sample=True,
         )
+        if user.password_hash is None:
+            user.set_password(password)
         if user.professor_profile is None:
             pick = ((i - 1) % 3, (i % 4))
             db.session.add(
@@ -103,14 +120,16 @@ def seed_database() -> dict[str, int]:
             role="student",
             is_sample=True,
         )
+        if user.password_hash is None:
+            user.set_password(password)
         if user.student_profile is None:
             db.session.add(
                 StudentProfile(user_id=user.id, level=level, field=field)
             )
 
     db.session.commit()
-    professors = User.query.filter_by(role="professor").count()
-    students = User.query.filter_by(role="student").count()
+    professors = User.query.filter_by(role="professor", is_sample=True).count()
+    students = User.query.filter_by(role="student", is_sample=True).count()
     return {"professors": professors, "students": students}
 
 

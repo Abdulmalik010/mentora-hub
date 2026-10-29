@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Mentora{% endblock %}</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-white text-slate-900 antialiased">
+  <header class="border-b border-slate-200">
+    <nav class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
+      <a href="{{ url_for('index') }}" class="text-lg font-semibold tracking-tight">Mentora</a>
+      <div class="flex items-center gap-4 text-sm">
+        {% if current_user %}
+          <span class="text-slate-600">{{ current_user.display_name }} &middot; {{ current_user.role }}</span>
+          <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Log out</button>
+          </form>
+        {% else %}
+          <a href="{{ url_for('auth.login') }}" class="font-medium text-teal-800 underline underline-offset-4 hover:text-teal-600">Log in</a>
+          <a href="{{ url_for('auth.register') }}" class="rounded-md bg-teal-800 px-3 py-1.5 font-medium text-white hover:bg-teal-700">Register</a>
+        {% endif %}
+      </div>
+    </nav>
+  </header>
+  <main class="mx-auto max-w-3xl px-4 py-8">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="mb-6 space-y-2">
+          {% for category, message in messages %}
+            <li class="rounded-md border px-3 py-2 text-sm {% if category == 'error' %}border-red-300 bg-red-50 text-red-800{% else %}border-slate-300 bg-slate-50 text-slate-700{% endif %}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    // Vanilla JS entry point; per-page scripts plug in via the scripts block.
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

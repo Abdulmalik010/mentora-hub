@@ -9,7 +9,6 @@ from typing import Any
 import pytest
 from flask import Flask
 
-from app import create_app
 from app.extensions import db
 from app.models import ProfessorProfile, StudentProfile, ToolCallLog, User
 from app.services.meta_client import (
@@ -20,24 +19,6 @@ from app.services.meta_client import (
     run_tool_loop,
 )
 from scripts.seed import seed_database
-
-
-@pytest.fixture
-def app(tmp_path):  # type: ignore[no-untyped-def]
-    """App with a throwaway file database (SQLite ``:memory:`` is per-connection)."""
-    app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path}/test.db",
-        }
-    )
-    ctx = app.app_context()
-    ctx.push()
-    db.create_all()
-    yield app
-    db.session.remove()
-    db.drop_all()
-    ctx.pop()
 
 
 def test_app_factory_boots_and_health_routes(app: Flask) -> None:

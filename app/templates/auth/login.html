@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Log in &middot; Mentora{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold tracking-tight">Log in</h1>
+<form method="post" action="{{ url_for('auth.login') }}" class="mt-5 max-w-md space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+  <div>
+    <label for="email" class="block text-sm font-medium">Email</label>
+    <input id="email" name="email" type="email" required
+      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label for="password" class="block text-sm font-medium">Password</label>
+    <input id="password" name="password" type="password" required
+      class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
+  </div>
+  <button type="submit" class="rounded-md bg-teal-800 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700">Log in</button>
+  <p class="text-sm text-slate-600">No account yet? <a href="{{ url_for('auth.register') }}" class="font-medium text-teal-800 underline underline-offset-4">Register</a>.</p>
+</form>
+{% endblock %}

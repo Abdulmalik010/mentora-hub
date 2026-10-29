@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
 from .extensions import db
 
 
@@ -41,6 +43,18 @@ class User(db.Model):
         uselist=False,
         cascade="all, delete-orphan",
     )
+
+    def set_password(self, password: str) -> None:
+        """Hash and store a password; the app layer always sets this."""
+        if not password:
+            raise ValueError("password must not be empty")
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        """True on match; False on mismatch or when no hash is stored."""
+        if not self.password_hash or not password:
+            return False
+        return check_password_hash(self.password_hash, password)
 
 
 class ProfessorProfile(db.Model):

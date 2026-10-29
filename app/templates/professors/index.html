@@ -34,6 +34,9 @@
               {{ badge(area) }}
             {% endfor %}
           </div>
+          {% if hit.rate is not none %}
+            <p class="mt-3 text-sm text-muted">{{ hit.rate|ngn }}/session <span class="text-xs">(sample pricing)</span></p>
+          {% endif %}
         {% endcall %}
       </li>
     {% endfor %}

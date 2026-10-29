@@ -6,6 +6,7 @@ structured call produces the top-3 ranking. Rankings are validated in code
 """
 from __future__ import annotations
 
+import json
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -29,6 +30,14 @@ MATCH_MAX_ITERATIONS = 6
 MATCH_MAX_TOOL_CALLS = 12
 MATCH_TIMEOUT_S = 180.0
 MATCH_MAX_ATTEMPTS = 5
+
+SCORE_ANCHORS = (
+    "Score each professor 0-100 (integers, strictly descending: "
+    "match 1 > match 2 > match 3). Anchors: 90+ covers every "
+    "high-severity gap with direct specialty overlap; 75-89 covers most "
+    "gaps or the top gap very well; 60-74 partially relevant, useful "
+    "caveats; below 60 weak fit, only when no better candidate exists."
+)
 
 MATCH_SYSTEM_PROMPT = (
     "You are Mentora's matching researcher. Find the best professors for a "
@@ -182,6 +191,7 @@ def search_professors(
                     "research_areas": profile.research_areas,
                     "bio_snippet": (profile.bio or "")[:160],
                     "is_sample": bool(user and user.is_sample),
+                    "rate": profile.rate,
                     "score": score,
                 },
             )
@@ -296,6 +306,8 @@ def coerce_ranking(raw: dict[str, Any]) -> dict[str, Any]:
     return {"matches": matches}
 
 
+ORDER_ERROR_PREFIX = "scores "
+
 def validate_ranking(
     ranking: dict[str, Any],
     professor_ids: set[int],
@@ -306,7 +318,15 @@ def validate_ranking(
     matches = ranking.get("matches", [])
     if len(matches) != 3:
         errors.append(f"expected exactly 3 matches, got {len(matches)}")
+    scores: list[int] = []
     for position, match in enumerate(matches, 1):
+        score = match.get("score")
+        if isinstance(score, bool) or not isinstance(score, int):
+            errors.append(f"match {position}: score must be an integer")
+        elif not 0 <= score <= 100:
+            errors.append(f"match {position}: score {score} outside 0-100")
+        else:
+            scores.append(score)
         if match.get("professor_id") not in professor_ids:
             errors.append(
                 f"match {position}: unknown professor_id {match.get('professor_id')!r}"
@@ -322,7 +342,22 @@ def validate_ranking(
                 errors.append(f"match {position}: empty evidence quote")
         if not match.get("next_slot", "").strip():
             errors.append(f"match {position}: next_slot is required")
+    if len(scores) == len(matches) and len(matches) > 1:
+        for first, second in zip(scores, scores[1:]):
+            if first <= second:
+                errors.append(
+                    f"scores not strictly descending: {scores} "
+                    "(rank order must follow score order)"
+                )
+                break
     return errors
+
+
+def only_order_errors(errors: list[str]) -> bool:
+    """True when every error is a score-ordering violation (safe to sort)."""
+    return bool(errors) and all(
+        error.startswith(ORDER_ERROR_PREFIX) for error in errors
+    )
 
 
 @dataclass(frozen=True)
@@ -374,6 +409,59 @@ def _summed_usage(results: Sequence[ChatResult]) -> dict[str, int]:
     }
 
 
+def _parse_tool_result(result: str | None) -> Any:
+    """Best-effort JSON decode of a tool result (None when not JSON)."""
+    if not result:
+        return None
+    try:
+        return json.loads(result)
+    except (TypeError, ValueError):
+        return None
+
+
+def summarize_tool_call(
+    tool_name: str, arguments: dict[str, Any], result: str | None
+) -> str:
+    """One human-readable line per tool call for the visible timeline."""
+    if tool_name == "search_professors":
+        keywords = [
+            str(item)
+            for item in arguments.get("keywords", []) or []
+            if isinstance(item, str)
+        ]
+        scope = arguments.get("department") or "all departments"
+        hits = _parse_tool_result(result)
+        names = (
+            [str(hit.get("display_name", "?")) for hit in hits]
+            if isinstance(hits, list)
+            else []
+        )
+        top = f" (top: {', '.join(names[:2])})" if names else " (no hits)"
+        return (
+            f"Searched {scope} for '{', '.join(keywords[:4])}': "
+            f"{len(names)} hits{top}"
+        )
+    if tool_name == "get_professor_profile":
+        profile = _parse_tool_result(result)
+        if isinstance(profile, dict) and "error" not in profile:
+            areas = ", ".join((profile.get("research_areas") or [])[:3])
+            return (
+                f"Checked profile: {profile.get('display_name', '?')}, "
+                f"{profile.get('department', '?')}: {areas}"
+            )
+        return f"Checked profile {arguments.get('professor_id')}: not found"
+    if tool_name == "check_availability":
+        availability = _parse_tool_result(result)
+        if isinstance(availability, dict) and "error" not in availability:
+            slots = availability.get("slots") or []
+            return (
+                f"Availability for professor "
+                f"{availability.get('professor_id')}: {len(slots)} open days"
+            )
+        return f"Availability check for {arguments.get('professor_id')}: not found"
+    return f"{tool_name} completed"
+
+
 def _bridge_tool_log(
     run_id: str, records: list[ToolCallRecord]
 ) -> Callable[[ToolCallRecord], None]:
@@ -382,15 +470,15 @@ def _bridge_tool_log(
     def _log(record: ToolCallRecord) -> None:
         records.append(record)
         log_tool_call_to_db(record)
-        args = json_dumps(record.arguments)[:120]
-        summary = (record.result or "")[:160].replace("\n", " ")
-        label = f"{record.tool_name}({args}) -> {summary}"[:190]
+        label = summarize_tool_call(
+            record.tool_name, record.arguments or {}, record.result
+        )[:195]
         log_event(
             run_id, "tool_call", label, status=record.status,
             payload={
                 "tool": record.tool_name,
                 "arguments": record.arguments,
-                "summary": summary,
+                "result": record.result,
             },
         )
 
@@ -484,6 +572,7 @@ def run_matching(
                     "role": "user",
                     "content": (
                         "RANKING PASS: rank the top 3 professors as JSON.\n"
+                        f"{SCORE_ANCHORS}\n"
                         f"Gaps (cite these ids):\n{gap_block}\n"
                         f"Research findings:\n{findings}\n"
                         f"Agent summary:\n{final_text or '(none; loop hit budget)'}\n"
@@ -504,8 +593,20 @@ def run_matching(
                 f"Ranking invalid ({errors[0]}); retrying once",
                 status="error",
             )
+    score_flagged = False
     if errors:
-        raise ValueError(f"ranking invalid after retry: {'; '.join(errors)}")
+        if only_order_errors(errors):
+            score_flagged = True
+            ranking["matches"].sort(
+                key=lambda item: item["score"], reverse=True
+            )
+            log_event(
+                run_id, "matching_scores_sorted",
+                f"Scores out of order after retry; sorted and flagged ({errors[0]})",
+                status="error",
+            )
+        else:
+            raise ValueError(f"ranking invalid after retry: {'; '.join(errors)}")
     log_event(run_id, "matching_validated", "Ranking validated: 3 matches")
     rows = []
     for rank, match in enumerate(ranking["matches"], 1):
@@ -514,6 +615,7 @@ def run_matching(
             professor_id=match["professor_id"],
             rank=rank,
             score=match["score"],
+            score_flagged=score_flagged,
             reasons=match["reasons"],
             caveats=match["caveats"],
             next_slot=match["next_slot"],

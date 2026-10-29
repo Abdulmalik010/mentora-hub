@@ -1,7 +1,7 @@
 """Render tests: every page returns 200 with no template errors."""
 from __future__ import annotations
 
-from flask import Flask, render_template
+from flask import Flask, render_template, render_template_string
 
 from app.extensions import db
 from app.models import CaseFile, User
@@ -33,6 +33,33 @@ def test_dashboard_shows_greeting_and_real_counts(app: Flask) -> None:
     assert b"Intake" in page.data  # first name from "Intake Student"
     assert b"Open cases" in page.data and b"Completed diagnoses" in page.data
     assert b"New request" in page.data
+
+
+def test_ngn_filter_formats_naira(app: Flask) -> None:
+    """The ngn filter renders thousands separators; junk degrades."""
+    with app.test_request_context("/"):
+        assert render_template_string("{{ 12500|ngn }}") == "\u20a612,500"
+        assert render_template_string("{{ 22000.0|ngn }}") == "\u20a622,000"
+        assert render_template_string("{{ none|ngn }}") == "\u20a6\u2014"
+
+
+def test_dashboard_shows_diagnosis_headline(app: Flask) -> None:
+    """Case cards surface the diagnosis core_problem when available."""
+    user = make_student()
+    db.session.add(
+        CaseFile(
+            student_id=user.id,
+            problem_text="My identification strategy is weak, honestly.",
+            status="done",
+            diagnosis={"core_problem": "Weak identification strategy."},
+        )
+    )
+    db.session.commit()
+    client = app.test_client()
+    login(client, "intake@example.com")
+    page = client.get("/dashboard")
+    assert page.status_code == 200
+    assert b"Weak identification strategy." in page.data
 
 
 def test_new_request_form_renders(app: Flask) -> None:

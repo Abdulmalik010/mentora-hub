@@ -45,6 +45,15 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
 
         return {"current_user": current_user()}
 
+    @app.template_filter("ngn")
+    def format_ngn(value: object) -> str:
+        """Format a naira amount with thousands separators (``₦12,500``)."""
+        try:
+            amount = float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return "₦—"
+        return f"₦{amount:,.0f}"
+
     @app.get("/")
     def index() -> str:
         """Home page (factory-level route; no extra blueprint for one page)."""

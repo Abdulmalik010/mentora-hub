@@ -66,6 +66,10 @@ class ProfessorProfile(db.Model):
     user_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False
     )
+    first_name = db.Column(db.String(80), nullable=True)
+    last_name = db.Column(db.String(80), nullable=True)
+    title = db.Column(db.String(10), nullable=True)
+    rank = db.Column(db.String(40), nullable=True)
     department = db.Column(db.String(120), nullable=False, index=True)
     research_areas = db.Column(db.JSON, nullable=False, default=list)
     bio = db.Column(db.Text, nullable=False, default="")
@@ -214,6 +218,7 @@ class MatchResult(db.Model):
     professor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     rank = db.Column(db.Integer, nullable=False)
     score = db.Column(db.Integer, nullable=False)
+    score_flagged = db.Column(db.Boolean, nullable=False, default=False)
     reasons = db.Column(db.JSON, nullable=False, default=list)
     caveats = db.Column(db.JSON, nullable=False, default=list)
     next_slot = db.Column(db.String(200), nullable=False, default="")

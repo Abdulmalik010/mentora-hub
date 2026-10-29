@@ -84,6 +84,33 @@ SAMPLE_BIO = (
     "not a real person."
 )
 
+# Fictional identities aligned with PROFESSOR_SPECS order:
+# (first name, last name, title, rank). Ordinary invented combinations; any
+# resemblance to real people is coincidental. Display names carry no numbers,
+# so the old NN label no longer implies anything about user ids.
+PROFESSOR_NAMES: tuple[tuple[str, str, str, str], ...] = (
+    ("Adaeze", "Nwosu", "Prof.", "Professor"),
+    ("Tunde", "Alabi", "Dr.", "Senior Lecturer"),
+    ("Yuki", "Tanaka", "Dr.", "Associate Professor"),
+    ("Lars", "Johansson", "Dr.", "Senior Lecturer"),
+    ("Priya", "Sharma", "Prof.", "Professor"),
+    ("Olumide", "Adeyemi", "Dr.", "Associate Professor"),
+    ("James", "Whitfield", "Dr.", "Senior Lecturer"),
+    ("Chen", "Wei", "Prof.", "Professor"),
+    ("Sofia", "Rossi", "Dr.", "Lecturer I"),
+    ("Kwame", "Mensah", "Dr.", "Senior Lecturer"),
+    ("Aisha", "Bello", "Prof.", "Professor"),
+    ("Chiamaka", "Obi", "Dr.", "Senior Lecturer"),
+    ("Diego", "Fernandez", "Dr.", "Associate Professor"),
+    ("Ngozi", "Eze", "Dr.", "Lecturer I"),
+    ("Anna", "Kowalski", "Dr.", "Associate Professor"),
+    ("Zanele", "Dlamini", "Dr.", "Senior Lecturer"),
+    ("Maria", "Santos", "Prof.", "Professor"),
+    ("Emeka", "Diallo", "Dr.", "Lecturer I"),
+    ("Fatima", "Hassan", "Dr.", "Senior Lecturer"),
+    ("David", "Osei", "Dr.", "Lecturer I"),
+)
+
 
 def _get_or_create_user(email: str, **fields: object) -> tuple[User, bool]:
     """Fetch a user by email or create one; True when newly created."""
@@ -97,23 +124,33 @@ def _get_or_create_user(email: str, **fields: object) -> tuple[User, bool]:
 
 
 def seed_database() -> dict[str, int]:
-    """Seed 12 professors and 3 students; safe to run repeatedly.
+    """Seed 20 professors and 3 students; safe to run repeatedly.
 
-    Must run inside an app context. Existing rows (matched by email) keep
-    their data; only a missing password hash is backfilled, so re-runs are
-    otherwise no-ops.
+    Must run inside an app context. Existing sample rows (matched by email)
+    are refreshed to the canonical spec values, so re-runs are convergent
+    no-ops once the database matches the spec.
     """
     password = _demo_password()
-    for i, (dept, areas, blurb) in enumerate(PROFESSOR_SPECS, 1):
+    for i, ((dept, areas, blurb), ident) in enumerate(
+        zip(PROFESSOR_SPECS, PROFESSOR_NAMES), 1
+    ):
+        first_name, last_name, title, rank = ident
+        display_name = f"{title} {first_name} {last_name}"
         user, _ = _get_or_create_user(
             f"sample-professor-{i:02d}@example.com",
-            display_name=f"Sample Professor {i:02d}",
+            display_name=display_name,
             role="professor",
             is_sample=True,
         )
         if user.password_hash is None:
             user.set_password(password)
+        if user.is_sample:
+            user.display_name = display_name
         profile_fields = {
+            "first_name": first_name,
+            "last_name": last_name,
+            "title": title,
+            "rank": rank,
             "department": dept,
             "research_areas": list(areas),
             "bio": f"{SAMPLE_BIO} {blurb}",

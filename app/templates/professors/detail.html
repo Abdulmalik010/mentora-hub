@@ -3,13 +3,13 @@
 {% block title %}{{ professor.display_name }} · Mentora Academic Hub{% endblock %}
 {% block content %}
 <p class="mb-4 text-sm font-semibold text-brand"><a href="{{ url_for('professors.index') }}" class="hover:text-brand-hover">← All professors</a></p>
-{% set parts = professor.display_name.split() %}
-{% set initials = ((parts[0][0] if parts|length > 0 else "?") + (parts[1][0] if parts|length > 1 else ""))|upper %}
+{% set fn = profile.first_name or "" %}{% set ln = profile.last_name or "" %}
+{% set initials = ((fn[:1] + ln[:1])|upper) or "?" %}
 <div class="flex items-start gap-4">
   <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand font-display text-xl font-semibold text-white" aria-hidden="true">{{ initials }}</span>
   <div class="min-w-0">
     <h1 class="font-display text-2xl font-semibold tracking-tight">{{ professor.display_name }}</h1>
-    <p class="mt-0.5 text-sm text-muted">{{ profile.department }} · {{ profile.timezone }}</p>
+    <p class="mt-0.5 text-sm text-muted">{% if profile.rank %}{{ profile.rank }} · {% endif %}{{ profile.department }} · {{ profile.timezone }}</p>
   </div>
 </div>
 <div class="mt-3 flex flex-wrap gap-2">
@@ -28,9 +28,9 @@
       · {{ (profile.availability or {}).get("hours", "") }}
     </p>
     {% if profile.rate is not none %}
-      <p class="mt-2 text-sm" title="Demo units; currency is decided at the booking step.">
-        <strong class="font-semibold">{{ profile.rate|int }}</strong>
-        <span class="text-muted">/ session (demo units)</span>
+      <p class="mt-2 text-sm">
+        <strong class="font-semibold">{{ profile.rate|ngn }}</strong>
+        <span class="text-muted">/ session (sample pricing)</span>
       </p>
     {% endif %}
     <div class="mt-4">

@@ -13,8 +13,10 @@ from app.services.matching import (
     check_availability,
     coerce_ranking,
     get_professor_profile,
+    only_order_errors,
     run_matching,
     search_professors,
+    summarize_tool_call,
     validate_ranking,
 )
 from app.services.meta_client import ChatResult, ToolCallRequest
@@ -172,6 +174,94 @@ def test_ranking_validator(app: Flask) -> None:
     assert coerced["matches"][0]["score"] == 100
 
 
+def unordered_ranking() -> dict[str, Any]:
+    """Valid ranking except scores ascend instead of descending."""
+    ranking = make_ranking(12, 2, 1)
+    for match, score in zip(ranking["matches"], (80, 90, 85)):
+        match["score"] = score
+    return ranking
+
+
+def test_ranking_validator_rejects_bad_scores(app: Flask) -> None:
+    """Scores must be integers 0-100 and strictly descending."""
+    seed_database()
+    prof_ids = {user.id for user in User.query.filter_by(role="professor")}
+    gaps = {"g1", "g2"}
+    unordered = unordered_ranking()
+    errors = validate_ranking(unordered, prof_ids, gaps)
+    assert any("strictly descending" in error for error in errors)
+    assert only_order_errors(errors)
+    non_int = make_ranking(12, 2, 1)
+    non_int["matches"][0]["score"] = "90"
+    assert any(
+        "must be an integer" in error
+        for error in validate_ranking(non_int, prof_ids, gaps)
+    )
+    out_of_range = make_ranking(12, 2, 1)
+    out_of_range["matches"][1]["score"] = 101
+    assert any(
+        "outside 0-100" in error
+        for error in validate_ranking(out_of_range, prof_ids, gaps)
+    )
+    mixed = unordered_ranking()
+    mixed["matches"][0]["professor_id"] = 999
+    assert not only_order_errors(validate_ranking(mixed, prof_ids, gaps))
+
+
+def test_matching_sorts_and_flags_unordered_scores(app: Flask) -> None:
+    """Order-only violations sort by score and persist flagged, not fatal."""
+    case = seed_match_case()
+    outcome = run_matching(
+        case, "run-match-1",
+        FakeMatchClient([unordered_ranking(), unordered_ranking()]),
+        model="fake-match", effort=None,
+    )
+    assert [row.score for row in outcome.matches] == [90, 85, 80]
+    assert [row.professor_id for row in outcome.matches] == [2, 1, 12]
+    assert all(row.score_flagged for row in outcome.matches)
+    assert RunEvent.query.filter_by(
+        run_id="run-match-1", type="matching_scores_sorted"
+    ).count() == 1
+    assert RunEvent.query.filter_by(
+        run_id="run-match-1", type="matching_validated"
+    ).count() == 1
+
+
+def test_summarize_tool_call(app: Flask) -> None:
+    """Each tool renders a one-line human summary; unknown tools degrade."""
+    seed_database()
+    search_result = json_dumps_hits(search_professors(["econometrics"]))
+    label = summarize_tool_call(
+        "search_professors", {"keywords": ["econometrics"]}, search_result
+    )
+    assert label.startswith("Searched all departments for 'econometrics'")
+    assert "Dr. Chiamaka Obi" in label
+    profile_label = summarize_tool_call(
+        "get_professor_profile", {"professor_id": 12},
+        json.dumps(get_professor_profile(12)),
+    )
+    assert profile_label == (
+        "Checked profile: Dr. Chiamaka Obi, Economics: "
+        "Econometrics, Policy evaluation"
+    )
+    availability_label = summarize_tool_call(
+        "check_availability", {"professor_id": 12, "days": 14},
+        json.dumps(check_availability(12, 14)),
+    )
+    assert availability_label.startswith("Availability for professor 12: ")
+    assert availability_label.endswith(" open days")
+    assert summarize_tool_call("mystery_tool", {}, None) == "mystery_tool completed"
+    assert summarize_tool_call(
+        "get_professor_profile", {"professor_id": 999},
+        json.dumps({"error": "unknown professor_id: 999"}),
+    ) == "Checked profile 999: not found"
+
+
+def json_dumps_hits(hits: list[dict[str, Any]]) -> str:
+    """Serialize tool hits the way the tool loop stores results."""
+    return json.dumps(hits)
+
+
 def test_run_matching_persists_and_logs(app: Flask) -> None:
     """Fake run persists 3 ranked rows and logs tools in both tables."""
     case = seed_match_case()
@@ -192,8 +282,13 @@ def test_run_matching_persists_and_logs(app: Flask) -> None:
         "matching_started", "tool_call", "matching_validated", "matching_finished",
     ]
     tool_event = RunEvent.query.filter_by(run_id="run-match-1", type="tool_call").one()
-    assert "search_professors" in tool_event.label
+    assert tool_event.label.startswith(
+        "Searched all departments for 'econometrics'"
+    )
+    assert "Dr. Chiamaka Obi" in tool_event.label
     assert tool_event.payload["tool"] == "search_professors"
+    assert tool_event.payload["arguments"] == {"keywords": ["econometrics"]}
+    assert "display_name" in (tool_event.payload["result"] or "")
 
 
 def test_matching_retries_once_then_persists(app: Flask) -> None:
@@ -231,11 +326,13 @@ def test_professors_directory_is_public(app: Flask) -> None:
     index = client.get("/professors")
     assert index.status_code == 200
     assert b"Sample profile" in index.data
-    assert b"Sample Professor 01" in index.data
+    assert b"Prof. Adaeze Nwosu" in index.data
+    assert "sample pricing" in index.get_data(as_text=True)
     filtered = client.get("/professors?q=econometrics&department=Economics")
     assert filtered.status_code == 200
-    assert b"Sample Professor 12" in filtered.data
-    assert b"Sample Professor 01" not in filtered.data
+    assert b"Dr. Chiamaka Obi" in filtered.data
+    assert b"Prof. Adaeze Nwosu" not in filtered.data
+    assert "\u20a622,000" in filtered.get_data(as_text=True)
 
 
 def test_professor_detail_and_404(app: Flask) -> None:
@@ -245,6 +342,9 @@ def test_professor_detail_and_404(app: Flask) -> None:
     page = client.get("/professors/12")
     assert page.status_code == 200
     assert b"Econometrics" in page.data and b"Sample profile" in page.data
+    assert b"Dr. Chiamaka Obi" in page.data
+    assert b"Senior Lecturer" in page.data
+    assert "\u20a622,000" in page.get_data(as_text=True)
     assert client.get("/professors/999").status_code == 404
 
 

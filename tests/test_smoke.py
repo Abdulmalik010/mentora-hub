@@ -80,6 +80,36 @@ def test_seed_is_idempotent(app: Flask) -> None:
     assert ProfessorProfile.query.count() == 20
 
 
+def test_seed_sets_fictional_professor_names(app: Flask) -> None:
+    """Seeded professors get fictional titled names, ranks and no numbers."""
+    seed_database()
+    first = User.query.filter_by(email="sample-professor-01@example.com").one()
+    assert first.display_name == "Prof. Adaeze Nwosu"
+    assert first.professor_profile is not None
+    assert first.professor_profile.first_name == "Adaeze"
+    assert first.professor_profile.last_name == "Nwosu"
+    assert first.professor_profile.title == "Prof."
+    assert first.professor_profile.rank == "Professor"
+    twelfth = User.query.filter_by(
+        email="sample-professor-12@example.com"
+    ).one()
+    assert twelfth.display_name == "Dr. Chiamaka Obi"
+    assert twelfth.professor_profile.rank == "Senior Lecturer"
+    names = [
+        user.display_name
+        for user in User.query.filter_by(role="professor").all()
+    ]
+    assert len(set(names)) == 20
+    assert all("Sample Professor" not in name for name in names)
+    seed_database()  # re-run keeps the canonical names (convergent refresh)
+    assert (
+        User.query.filter_by(email="sample-professor-01@example.com")
+        .one()
+        .display_name
+        == "Prof. Adaeze Nwosu"
+    )
+
+
 class FakeChatClient:
     """Scripted chat client: tool call(s) first, then a final answer."""
 

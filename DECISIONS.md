@@ -49,3 +49,10 @@
 - 2026-10-29: Ranking prompt carries the tool findings transcript, not just the loop summary.
 - 2026-10-29: Professors directory and profiles are public; case routes stay student-only.
 - 2026-10-29: Evals are live scripts (never pytest): eval_diagnosis measures recall/grounding/latency parallel-vs-single; eval_matching scores top-1/top-3 over 30 generated cases; reports go to docs/eval/.
+- 2026-10-29: ProfessorProfile gains nullable first_name/last_name/title/rank; seed assigns 20 fictional titled names and refreshes stale sample display names (convergent); numbering dropped so NN implies nothing about user ids.
+- 2026-10-29: Ranking scores must be integers 0-100 strictly descending; order-only violations are sorted and persisted flagged (MatchResult.score_flagged), structural violations still raise after one retry.
+- 2026-10-29: Ranking prompt carries numeric score anchors (90+ full high-severity coverage, 75-89 most gaps, 60-74 partial, sub-60 weak fit).
+- 2026-10-29: Timeline tool events show a one-line human summary; raw args/results move to the event payload behind a Details toggle (server and live rows).
+- 2026-10-29: Prices render as NGN via the ngn filter (thousands separators); seed rates are sample pricing, labeled in the UI.
+- 2026-10-29: tzdata 2026.6 pinned so ZoneInfo('Africa/Lagos') resolves on Windows.
+- 2026-10-29: Dashboard case cards show the diagnosis core_problem headline when a diagnosis exists.

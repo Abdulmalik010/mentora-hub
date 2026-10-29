@@ -195,9 +195,8 @@ def main() -> None:
     SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
     (SAMPLES_DIR / PDF_FILENAME).write_bytes(pdf_bytes(PDF_PAGES))
     (SAMPLES_DIR / DOCX_FILENAME).write_bytes(docx_bytes(DOCX_PARAGRAPHS))
-    (SAMPLES_DIR / "expected.json").write_text(
-        json.dumps(expected_flaws(), indent=2) + "\n", encoding="utf-8"
-    )
+    with open(SAMPLES_DIR / "expected.json", "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(expected_flaws(), indent=2) + "\n")
     print(f"Wrote samples to {SAMPLES_DIR}")
 
 

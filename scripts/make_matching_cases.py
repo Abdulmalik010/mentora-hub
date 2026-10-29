@@ -87,9 +87,8 @@ def main() -> None:
     """Write eval/matching_cases.json."""
     EVAL_DIR.mkdir(parents=True, exist_ok=True)
     cases = build_cases()
-    (EVAL_DIR / "matching_cases.json").write_text(
-        json.dumps(cases, indent=2) + "\n", encoding="utf-8"
-    )
+    with open(EVAL_DIR / "matching_cases.json", "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(cases, indent=2) + "\n")
     print(f"Wrote {len(cases)} cases to {EVAL_DIR / 'matching_cases.json'}")
 
 

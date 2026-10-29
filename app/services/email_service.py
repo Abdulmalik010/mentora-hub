@@ -15,6 +15,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.message import EmailMessage
+from typing import Any
 
 import httpx
 
@@ -243,29 +244,60 @@ def _agenda(gaps: list[dict[str, object]]) -> list[str]:
     ]
 
 
+def case_file_context(case: CaseFile) -> dict[str, Any]:
+    """Shared case-file data for the email and the professor page.
+
+    Both surfaces render from this context so the page always shows the
+    same content the professor received by email.
+    """
+    gaps = _top_gaps(case)
+    diagnosis = case.diagnosis or {}
+    return {
+        "core_problem": str(diagnosis.get("core_problem", "—")),
+        "gaps": [
+            {
+                "category": str(gap.get("category", "other")),
+                "description": str(gap.get("description", "")),
+                "severity": gap.get("severity", 1) or 1,
+                "evidence": _short_quote(gap.get("evidence", []) or []),  # type: ignore[arg-type]
+            }
+            for gap in gaps
+        ],
+        "questions": [
+            str(item)
+            for item in diagnosis.get("questions_for_professor", []) or []
+        ],
+        "tried": [
+            str(item)
+            for item in diagnosis.get("what_student_already_tried", []) or []
+        ],
+        "agenda": _agenda(gaps),
+    }
+
+
 def build_case_file_email(
     *, booking: Booking, case: CaseFile, professor: User, student: User
 ) -> OutgoingEmail:
     """Professor case file: diagnosis brief, evidence, questions, agenda."""
-    diagnosis = case.diagnosis or {}
-    gaps = _top_gaps(case)
-    questions = diagnosis.get("questions_for_professor", []) or []
-    tried = diagnosis.get("what_student_already_tried", []) or []
+    ctx = case_file_context(case)
+    gaps = ctx["gaps"]
+    questions = ctx["questions"]
+    tried = ctx["tried"]
+    agenda = ctx["agenda"]
     slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
     meeting = booking.meeting_url or "—"
 
-    def gap_text(gap: dict[str, object], index: int) -> str:
+    def gap_text(gap: dict[str, Any], index: int) -> str:
         return (
-            f"{index}. [{gap.get('category', 'other')}] "
-            f"{gap.get('description', '')}\n"
-            f"   Evidence: {_short_quote(gap.get('evidence', []) or [])}"  # type: ignore[arg-type]
+            f"{index}. [{gap['category']}] {gap['description']}\n"
+            f"   Evidence: {gap['evidence']}"
         )
 
     text_lines = [
         f"Case file for {student.display_name} (Mentora Academic Hub).",
         "",
         "Core problem:",
-        str(diagnosis.get("core_problem", "—")),
+        str(ctx["core_problem"]),
         "",
         "Top gaps:",
         (
@@ -285,7 +317,7 @@ def build_case_file_email(
         "\n".join(f"- {item}" for item in tried) if tried else "None recorded.",
         "",
         "Suggested 45-minute agenda:",
-        "\n".join(f"- {item}" for item in _agenda(gaps)),
+        "\n".join(f"- {item}" for item in agenda),
         "",
         f"Session: {slot} · 60 minutes",
         f"Meeting link: {meeting}",
@@ -295,14 +327,14 @@ def build_case_file_email(
     if student.is_sample or professor.is_sample:
         text_lines.append("[SAMPLE DATA] Synthetic demo content; not a real person.")
 
-    def gap_html(gap: dict[str, object]) -> str:
+    def gap_html(gap: dict[str, Any]) -> str:
         return (
             "<li><strong>["
-            + html.escape(str(gap.get("category", "other")))
+            + html.escape(str(gap["category"]))
             + "]</strong> "
-            + html.escape(str(gap.get("description", "")))
+            + html.escape(str(gap["description"]))
             + "<br>Evidence: <em>"
-            + html.escape(_short_quote(gap.get("evidence", []) or []))  # type: ignore[arg-type]
+            + html.escape(str(gap["evidence"]))
             + "</em></li>"
         )
 
@@ -319,7 +351,7 @@ def build_case_file_email(
 </div>
 <div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
 <h2 style="margin-top:0">Core problem</h2>
-<p>{html.escape(str(diagnosis.get("core_problem", "—")))}</p>
+<p>{html.escape(str(ctx["core_problem"]))}</p>
 <h2>Top gaps</h2>
 {"<ol>" + "".join(gap_html(g) for g in gaps) + "</ol>" if gaps else "<p>None recorded.</p>"}
 <h2>The student's questions</h2>
@@ -327,7 +359,7 @@ def build_case_file_email(
 <h2>What the student already tried</h2>
 {list_html(tried, "None recorded.")}
 <h2>Suggested 45-minute agenda</h2>
-{list_html(_agenda(gaps), "")}
+{list_html(agenda, "")}
 <h2>Session</h2>
 <p>{html.escape(slot)} · 60 minutes<br>
 Meeting link: <a href="{html.escape(meeting)}">{html.escape(meeting)}</a></p>

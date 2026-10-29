@@ -20,8 +20,9 @@ Jinja + Tailwind shell, Step 2b security close-out (seed demo logins, SECRET_KEY
 fail-fast, CSRF, hardened cookies) and a live Meta API check script, Step 3a
 student intake with document diagnosis and a live agent timeline, Step 3b
 parallel specialists, evidence-based professor matching and live eval scripts,
-Step 4 booking (slot grid, consent, demo checkout, sessions pages) and email
-(Resend HTTPS or local outbox, case-file + confirmation emails).
+Step 4 booking (slot grid, consent, demo checkout, sessions pages), email
+(Resend HTTPS or local outbox, case-file + confirmation emails) and the
+professor dashboard (upcoming bookings, read-only case-file pages).
 No recording, transcription or PDF notes code exists yet.
 
 ## Stack
@@ -77,8 +78,8 @@ app/
                      CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
                      MatchResult, EmailLog, ToolCallLog
   security.py        current_user, login_required, role_required
-  blueprints/        auth (register/login/logout), cases (dashboard, intake,
-                     detail, events, booking, sessions),
+  blueprints/        auth (register/login/logout), cases (role dashboards,
+                     intake, detail, events, booking, sessions, case file),
                      professors (public directory), bookings, agent (health)
   templates/         base shell + design macros (_ui.html) + auth/case pages
   services/
@@ -133,7 +134,10 @@ with a Jitsi link. Emails default to the local `outbox/` provider (gitignored
 sandbox only delivers to the account owner, `@example.com` sample addresses
 are refused outright, and every redirected email carries a
 "Demo: intended for" banner. Each booking sends each email kind at most once
-(`EmailLog`); mail failures never break the booking.
+(`EmailLog`); mail failures never break the booking. Professors log in with
+their seeded `sample-professor-NN@example.com` address and
+`SEED_DEMO_PASSWORD`: `/dashboard` shows upcoming bookings, each with the
+read-only case file the email carried (consent-gated).
 
 ## Evaluation
 

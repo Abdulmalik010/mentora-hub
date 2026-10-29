@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card, badge %}
+{% block title %}Case file · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}
+{% block content %}
+<p class="mb-4 text-sm font-semibold text-brand"><a href="{{ url_for('cases.dashboard') }}" class="hover:text-brand-hover">← Dashboard</a></p>
+<div class="mb-6">
+  <div class="flex flex-wrap items-center gap-2">
+    <h1 class="font-display text-2xl font-semibold tracking-tight">Case file: {{ student.display_name if student else "Student" }}</h1>
+    {% if student and student.is_sample %}{{ badge("Sample data", tone="warn") }}{% endif %}
+  </div>
+  <p class="mt-1 text-sm text-muted">{{ booking.scheduled_at|wat }} · 60 minutes · your time: <span data-utc="{{ booking.scheduled_at|utc_iso }}">…</span></p>
+  {% if booking.meeting_url %}
+    <p class="mt-1 text-sm"><a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a></p>
+  {% endif %}
+</div>
+<div class="space-y-4">
+  {% call card("Core problem") %}
+    <p class="mt-2 text-sm leading-relaxed">{{ file.core_problem }}</p>
+  {% endcall %}
+  {% call card("Top gaps") %}
+    {% if file.gaps %}
+      <ol class="mt-2 space-y-4">
+        {% for gap in file.gaps %}
+          <li>
+            <div class="flex flex-wrap items-center gap-2">
+              {{ badge(gap.category, tone="brand") }}
+              <span class="text-xs font-medium text-muted">severity {{ gap.severity }}/3</span>
+            </div>
+            <p class="mt-1.5 text-sm leading-relaxed">{{ gap.description }}</p>
+            <blockquote class="mt-1.5 rounded-lg border-l-4 border-gold bg-paper px-4 py-2 text-sm text-muted">{{ gap.evidence }}</blockquote>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="mt-2 text-sm text-muted">None recorded.</p>
+    {% endif %}
+  {% endcall %}
+  {% call card("The student's questions") %}
+    {% if file.questions %}
+      <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm">
+        {% for item in file.questions %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    {% else %}
+      <p class="mt-2 text-sm text-muted">None recorded.</p>
+    {% endif %}
+  {% endcall %}
+  {% call card("What the student already tried") %}
+    {% if file.tried %}
+      <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm">
+        {% for item in file.tried %}<li>{{ item }}</li>{% endfor %}
+      </ul>
+    {% else %}
+      <p class="mt-2 text-sm text-muted">None recorded.</p>
+    {% endif %}
+  {% endcall %}
+  {% call card("Suggested 45-minute agenda") %}
+    <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm">
+      {% for item in file.agenda %}<li>{{ item }}</li>{% endfor %}
+    </ul>
+  {% endcall %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    document.querySelectorAll('[data-utc]').forEach(function (el) {
+      try {
+        el.textContent = new Date(el.getAttribute('data-utc')).toLocaleString([], {
+          weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      } catch (e) { el.textContent = ''; }
+    });
+  })();
+</script>
+{% endblock %}

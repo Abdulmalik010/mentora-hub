@@ -126,7 +126,7 @@ def test_error_pages_render(app: Flask) -> None:
     assert missing.status_code == 404
     assert b"Page not found" in missing.data
     login(client, "prof403@example.com")
-    forbidden = client.get("/dashboard")
+    forbidden = client.get("/cases/new")
     assert forbidden.status_code == 403
     assert b"Not allowed" in forbidden.data
     with app.test_request_context("/"):

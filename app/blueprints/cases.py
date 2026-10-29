@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from flask import (
@@ -17,10 +17,10 @@ from ..models import (
     Booking, CaseFile, Document, MatchResult, ProfessorProfile, RunEvent,
     User,
 )
-from ..security import current_user, role_required
+from ..security import current_user, login_required, role_required
 from ..services.booking import SlotTakenError, create_booking
 from ..services.diagnosis import run_case_pipeline
-from ..services.email_service import send_booking_emails
+from ..services.email_service import case_file_context, send_booking_emails
 from ..services.extraction import ExtractionError, save_upload, validate_upload
 from ..services.matching import get_case_matches
 from ..services.slots import Slot, generate_slots, slot_from_key
@@ -40,11 +40,15 @@ def _own_case_or_404(case_id: int) -> CaseFile:
 
 
 @bp.get("/dashboard")
-@role_required("student")
+@login_required
 def dashboard() -> str:
-    """Student's cases plus the new-request action."""
+    """Role home: the student's cases, or the professor's bookings."""
     user = current_user()
-    assert user is not None  # guaranteed by role_required
+    assert user is not None  # guaranteed by login_required
+    if user.role == "professor":
+        return _professor_dashboard(user)
+    if user.role != "student":
+        abort(403)
     cases = (
         CaseFile.query.filter_by(student_id=user.id)
         .order_by(CaseFile.created_at.desc())
@@ -75,6 +79,58 @@ def dashboard() -> str:
 def new_form() -> str:
     """Render the new-request form."""
     return render_template("cases/new.html")
+
+
+def _professor_dashboard(user: User) -> str:
+    """Upcoming bookings for one professor, soonest first."""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    bookings = (
+        Booking.query.filter(
+            Booking.professor_id == user.id,
+            Booking.scheduled_at.is_not(None),
+            Booking.scheduled_at >= now,
+        )
+        .order_by(Booking.scheduled_at.asc())
+        .all()
+    )
+    rows = [
+        {
+            "booking": booking,
+            "student": db.session.get(User, booking.student_id),
+        }
+        for booking in bookings
+    ]
+    return render_template("cases/prof_dashboard.html", rows=rows)
+
+
+@bp.get("/dashboard/bookings/<int:booking_id>")
+@role_required("professor")
+def professor_case_file(booking_id: int) -> str:
+    """Read-only case file: the same content the email carried.
+
+    Restricted to the booked professor, and only when the student
+    consented to share the diagnosis; anything else is a 404.
+    """
+    booking = db.session.get(Booking, booking_id)
+    user = current_user()
+    if (
+        booking is None
+        or user is None
+        or booking.professor_id != user.id
+        or not booking.consent_share_diagnosis
+    ):
+        abort(404)
+    case = db.session.get(CaseFile, booking.case_id) if booking.case_id else None
+    if case is None:
+        abort(404)
+    student = db.session.get(User, booking.student_id)
+    return render_template(
+        "cases/case_file.html",
+        booking=booking,
+        case=case,
+        student=student,
+        file=case_file_context(case),
+    )
 
 
 def _launch_pipeline(app: Flask, case_id: int, run_id: str) -> None:

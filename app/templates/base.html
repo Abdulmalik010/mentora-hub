@@ -18,6 +18,8 @@
           <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
           <a href="{{ url_for('cases.new_form') }}" class="font-medium text-muted hover:text-ink">New request</a>
           <a href="{{ url_for('cases.sessions_list') }}" class="font-medium text-muted hover:text-ink">Sessions</a>
+        {% elif current_user.role == "professor" %}
+          <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="font-medium text-muted hover:text-ink">Professors</a>
         <details class="user-menu relative">
@@ -50,6 +52,8 @@
           <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
           <a href="{{ url_for('cases.new_form') }}" class="py-1">New request</a>
           <a href="{{ url_for('cases.sessions_list') }}" class="py-1">Sessions</a>
+        {% elif current_user.role == "professor" %}
+          <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="py-1">Professors</a>
         <form method="post" action="{{ url_for('auth.logout') }}">

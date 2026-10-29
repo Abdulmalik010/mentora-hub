@@ -67,3 +67,5 @@
 - 2026-10-29: EmailLog rows are idempotent per (booking, kind); one retry on transport/5xx, 4xx fails fast; mail failures are logged and never break the booking.
 - 2026-10-29: The case-file email goes out only with the consent flag; the 45-minute agenda is a static template filled with the actual top gaps (no model call).
 - 2026-10-29: Booking emails send synchronously in the checkout request (demo scale); move to a worker if Resend latency ever matters.
+- 2026-10-29: /dashboard branches by role (students keep cases, professors get upcoming bookings); the case file lives at /dashboard/bookings/<id>, professor-only, consent-gated, 404 otherwise.
+- 2026-10-29: Email and case-file page share case_file_context() so both surfaces always show identical content.

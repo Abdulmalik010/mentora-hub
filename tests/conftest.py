@@ -19,6 +19,7 @@ def app(tmp_path):  # type: ignore[no-untyped-def]
     app = create_app(
         {
             "TESTING": True,
+            "SECRET_KEY": "test-only-not-a-real-secret",
             "WTF_CSRF_ENABLED": False,  # CSRF has its own dedicated test
             "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path}/test.db",
         }

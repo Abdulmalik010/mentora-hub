@@ -146,6 +146,7 @@ def test_post_without_csrf_token_rejected(tmp_path) -> None:  # type: ignore[no-
     app = create_app(
         {
             "TESTING": True,
+            "SECRET_KEY": "test-only-not-a-real-secret",
             "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path}/csrf.db",
         }
     )

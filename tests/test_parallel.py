@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import pytest
 from flask import Flask
 
 from app.extensions import db
@@ -44,6 +45,14 @@ MERGE_PAYLOAD = {
     "expertise_keywords": ["hypothesis testing"],
     "confidence": 0.8,
 }
+
+
+@pytest.fixture(autouse=True)
+def _stub_matching(monkeypatch):  # type: ignore[no-untyped-def]
+    """Parallel tests cover diagnosis; matching is tested separately offline."""
+    monkeypatch.setattr(
+        "app.services.diagnosis._run_matching_phase", lambda *args, **kwargs: None
+    )
 
 
 class RoutingFake:

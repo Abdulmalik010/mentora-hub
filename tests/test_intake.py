@@ -58,6 +58,14 @@ def login(client: FlaskClient, email: str) -> Any:  # type: ignore[type-arg]
     )
 
 
+@pytest.fixture(autouse=True)
+def _stub_matching(monkeypatch):  # type: ignore[no-untyped-def]
+    """Intake tests cover diagnosis; matching is tested separately offline."""
+    monkeypatch.setattr(
+        "app.services.diagnosis._run_matching_phase", lambda *args, **kwargs: None
+    )
+
+
 class CannedJsonClient:
     """Fake chat client returning one canned JSON payload as text."""
 

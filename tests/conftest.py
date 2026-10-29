@@ -13,6 +13,15 @@ def _seed_demo_password(monkeypatch):  # type: ignore[no-untyped-def]
     monkeypatch.setenv("SEED_DEMO_PASSWORD", "test-seed-password-123")
 
 
+@pytest.fixture(autouse=True)
+def _email_outbox(monkeypatch, tmp_path):  # type: ignore[no-untyped-def]
+    """Tests never touch Resend: outbox provider into a throwaway dir."""
+    monkeypatch.setenv("EMAIL_PROVIDER", "outbox")
+    monkeypatch.setenv("EMAIL_OUTBOX_DIR", str(tmp_path / "outbox"))
+    monkeypatch.delenv("DEMO_RECIPIENT_OVERRIDE", raising=False)
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+
+
 @pytest.fixture
 def app(tmp_path):  # type: ignore[no-untyped-def]
     """App with a throwaway file database (SQLite ``:memory:`` is per-connection)."""

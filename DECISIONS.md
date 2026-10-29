@@ -62,3 +62,8 @@
 - 2026-10-29: Booking requires a MatchResult for the (case, professor) pair (404 otherwise); /sessions routes live in the student-workspace blueprint because the /bookings prefix does not fit them.
 - 2026-10-29: The consent checkbox is mandatory; demo card fields are ignored server-side and never stored.
 - 2026-10-29: Times are stored UTC, rendered WAT server-side, with a JS local-time hint from a data-utc attribute.
+- 2026-10-29: Email sends over HTTPS via Resend or to a local .eml outbox (default); SMTP rejected because Render's free tier blocks its ports.
+- 2026-10-29: DEMO_RECIPIENT_OVERRIDE reroutes every email to one inbox with a "Demo: intended for" banner; @example.com is refused by the Resend provider without it.
+- 2026-10-29: EmailLog rows are idempotent per (booking, kind); one retry on transport/5xx, 4xx fails fast; mail failures are logged and never break the booking.
+- 2026-10-29: The case-file email goes out only with the consent flag; the 45-minute agenda is a static template filled with the actual top gaps (no model call).
+- 2026-10-29: Booking emails send synchronously in the checkout request (demo scale); move to a worker if Resend latency ever matters.

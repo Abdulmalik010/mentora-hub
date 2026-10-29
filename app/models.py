@@ -237,6 +237,26 @@ class MatchResult(db.Model):
     professor = db.relationship("User", foreign_keys=[professor_id])
 
 
+class EmailLog(db.Model):
+    """Audit row for one outbound email; idempotent per booking and kind."""
+
+    __tablename__ = "email_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(
+        db.Integer, db.ForeignKey("bookings.id"), nullable=False, index=True
+    )
+    kind = db.Column(db.String(40), nullable=False)
+    recipient = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="pending")
+    provider = db.Column(db.String(20), nullable=False, default="")
+    provider_id = db.Column(db.String(255), nullable=True)
+    error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+    booking = db.relationship("Booking", foreign_keys=[booking_id])
+
+
 class ToolCallLog(db.Model):
     """Audit row for every agent tool call (see ``run_tool_loop``)."""
 

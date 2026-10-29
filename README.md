@@ -19,8 +19,10 @@ tests), Step 2 session auth (register/login/logout, role guards) plus the base
 Jinja + Tailwind shell, Step 2b security close-out (seed demo logins, SECRET_KEY
 fail-fast, CSRF, hardened cookies) and a live Meta API check script, Step 3a
 student intake with document diagnosis and a live agent timeline, Step 3b
-parallel specialists, evidence-based professor matching and live eval scripts.
-No booking, email, recording, transcription or PDF notes code exists yet.
+parallel specialists, evidence-based professor matching and live eval scripts,
+Step 4 booking (slot grid, consent, demo checkout, sessions pages) and email
+(Resend HTTPS or local outbox, case-file + confirmation emails).
+No recording, transcription or PDF notes code exists yet.
 
 ## Stack
 
@@ -59,7 +61,10 @@ PDF/DOCX/TXT extraction, upload validation, grounding checker, owner-only
 access, CSRF on the intake form, background pipeline runs (fake client).
 Parallel coverage: specialist merge/rank, partial and total failure, merge
 failure, bad mode flag. Matching coverage: tool scoring, ranking validator,
-retry-once, budget degrade, tool-call logging, professors routes.
+retry-once, budget degrade, tool-call logging, professors routes. Booking
+coverage: slot grid and timezones, double-booking race, consent gating,
+sessions access. Email coverage: providers, recipient override, idempotency,
+refusals, content builders.
 
 ## Layout
 
@@ -70,18 +75,20 @@ app/
   extensions.py      shared extensions (db)
   models.py          User, ProfessorProfile, StudentProfile, Document,
                      CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
-                     MatchResult, ToolCallLog
+                     MatchResult, EmailLog, ToolCallLog
   security.py        current_user, login_required, role_required
   blueprints/        auth (register/login/logout), cases (dashboard, intake,
-                     detail, events), professors (public directory),
-                     bookings, agent (health only)
+                     detail, events, booking, sessions),
+                     professors (public directory), bookings, agent (health)
   templates/         base shell + design macros (_ui.html) + auth/case pages
   services/
     meta_client.py   Meta API: retries, structured output, run_tool_loop
     extraction.py    upload validation, storage, text extraction
     diagnosis.py     parallel/single diagnosis, grounding, intake pipeline
     matching.py      professor tools, ranking, validation, match runner
-    email_service.py stub (provider TBD)
+    slots.py         60-minute slot grid (UTC store, WAT display)
+    booking.py       race-safe booking creation, Jitsi links, demo refs
+    email_service.py Resend HTTPS or local outbox, case-file + confirmation
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
 scripts/seed.py      idempotent synthetic seed (20 profs / 4 depts / 3 students)
@@ -93,7 +100,8 @@ scripts/eval_matching.py live matching eval (never run by pytest)
 samples/             synthetic thesis excerpts + expected.json (demo fixtures)
 eval/                30 generated matching-eval cases
 docs/eval/           eval reports (written by the eval scripts)
-tests/               pytest suite (smoke + auth + intake + parallel + matching)
+tests/               pytest suite (smoke, auth, intake, parallel, matching,
+                     booking, email)
 ```
 
 ## Live API check
@@ -113,6 +121,19 @@ Log in as a seeded student (any `sample-student-0X@example.com` address with
 `samples/thesis_excerpt_stats.pdf` attached. The case page shows the agent
 timeline on the right as each real step completes, then the diagnosis with
 grounded evidence quotes plus three recommended professors on the left.
+
+## Booking + email demo
+
+From a finished case, open "Book session" on any match card: pick a WAT slot,
+tick the diagnosis-sharing consent, and confirm through the clearly labeled
+demo checkout (nothing is charged or stored). The session lands under Sessions
+with a Jitsi link. Emails default to the local `outbox/` provider (gitignored
+`.eml` files, never delivered). For real delivery set `EMAIL_PROVIDER=resend`,
+`RESEND_API_KEY`, and `DEMO_RECIPIENT_OVERRIDE` to your own inbox: the Resend
+sandbox only delivers to the account owner, `@example.com` sample addresses
+are refused outright, and every redirected email carries a
+"Demo: intended for" banner. Each booking sends each email kind at most once
+(`EmailLog`); mail failures never break the booking.
 
 ## Evaluation
 

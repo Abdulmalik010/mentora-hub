@@ -33,7 +33,7 @@ def test_app_factory_boots_and_health_routes(app: Flask) -> None:
 
 
 def test_models_import_and_tables_exist(app: Flask) -> None:
-    """All ten scaffold models are importable and have tables."""
+    """All scaffold models are importable and have tables."""
     import app.models  # noqa: F401
 
     assert set(db.metadata.tables) == {
@@ -47,6 +47,7 @@ def test_models_import_and_tables_exist(app: Flask) -> None:
         "match_results",
         "memory_notes",
         "run_events",
+        "email_logs",
         "tool_call_logs",
     }
     assert User.query.count() == 0

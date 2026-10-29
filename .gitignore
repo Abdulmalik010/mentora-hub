@@ -1,6 +1,7 @@
 .env
 *.db
 uploads/
+outbox/
 __pycache__/
 .venv/
 *.pyc

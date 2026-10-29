@@ -20,6 +20,7 @@ from ..models import (
 from ..security import current_user, role_required
 from ..services.booking import SlotTakenError, create_booking
 from ..services.diagnosis import run_case_pipeline
+from ..services.email_service import send_booking_emails
 from ..services.extraction import ExtractionError, save_upload, validate_upload
 from ..services.matching import get_case_matches
 from ..services.slots import Slot, generate_slots, slot_from_key
@@ -294,6 +295,11 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
         flash(str(exc), "error")
         return _render_book_form(case, professor, profile, match, 409)
     flash("Session booked. The meeting link is on this page.", "success")
+    try:
+        send_booking_emails(booking.id)
+    except Exception:  # noqa: BLE001 — email must never break the booking
+        current_app.logger.exception("booking emails failed")
+        flash("Booked, but the notification emails could not be sent.", "error")
     return redirect(url_for("cases.session_detail", booking_id=booking.id))
 
 

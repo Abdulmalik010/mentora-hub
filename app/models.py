@@ -194,7 +194,12 @@ class SessionRecord(db.Model):
         db.Integer, db.ForeignKey("bookings.id"), unique=True, nullable=False
     )
     consent = db.Column(db.Boolean, nullable=False, default=False)
+    status = db.Column(db.String(20), nullable=False, default="pending")
+    run_id = db.Column(db.String(64), nullable=True, index=True)
+    audio_path = db.Column(db.String(500), nullable=True)
     transcript = db.Column(db.Text, nullable=True)
+    turns = db.Column(db.JSON, nullable=True)
+    speaker_map = db.Column(db.JSON, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     pdf_path = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)

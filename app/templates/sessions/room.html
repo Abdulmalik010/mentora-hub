@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card, badge, status_chip, empty_state %}
+{% block title %}Session room · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <p class="text-sm font-semibold text-brand"><a href="{{ url_for('cases.session_detail', booking_id=booking.id) if current_user.role == 'student' else url_for('cases.dashboard') }}" class="hover:text-brand-hover">← Back</a></p>
+  <h1 class="mt-1 font-display text-2xl font-semibold tracking-tight">Session room</h1>
+  <p class="mt-1 text-sm text-muted">{{ student.display_name }} × {{ professor.display_name }} · {{ booking.scheduled_at|wat }} · 60 minutes</p>
+  <div class="mt-2">{{ status_chip(booking.status) }}</div>
+</div>
+
+<div class="grid items-start gap-6 lg:grid-cols-5">
+  <div class="space-y-6 lg:col-span-3">
+    {% call card("Meeting") %}
+      {% if booking.status == "accepted" and booking.meeting_url %}
+        <p class="mt-2 text-sm"><a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a></p>
+        <p class="mt-1 text-xs text-muted">Meet on the video call, then record or upload the session audio below for notes.</p>
+      {% else %}
+        <p class="mt-2 text-sm text-muted">The meeting link appears once the professor accepts.</p>
+      {% endif %}
+    {% endcall %}
+
+    {% call card("Recording") %}
+      {% if recording_allowed %}
+        <form id="audio-form" method="post" action="{{ url_for('cases.session_room_audio', booking_id=booking.id) }}" enctype="multipart/form-data" class="mt-2 space-y-4">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="flex cursor-pointer items-start gap-2 text-sm">
+            <input type="checkbox" id="consent" name="consent" value="yes" class="mt-1">
+            <span>I consent to recording this session for transcription and notes. Everyone on the call has agreed.</span>
+          </label>
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" id="record-btn" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover">● Record</button>
+            <button type="button" id="stop-btn" disabled class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-muted disabled:opacity-50">Stop</button>
+            <span id="rec-timer" class="text-sm tabular-nums text-muted" aria-live="polite">00:00 / 09:30</span>
+          </div>
+          <p id="rec-status" class="text-sm text-muted" aria-live="polite">16 kHz mono WAV, recorded in your browser. Nothing leaves this page until you upload.</p>
+          <div>
+            <label for="audio-file" class="text-sm font-semibold">Or upload a WAV file</label>
+            <input type="file" id="audio-file" name="audio" accept=".wav,audio/wav" class="mt-1 block w-full text-sm">
+            <p class="mt-1 text-xs text-muted">WAV only: mono, 16-bit, 16 or 24 kHz, max 10 minutes and 32 MB.</p>
+          </div>
+          <div id="upload-progress" class="hidden">
+            <div class="h-2 overflow-hidden rounded-full bg-border"><div id="upload-bar" class="h-full w-0 bg-brand"></div></div>
+            <p id="upload-label" class="mt-1 text-xs text-muted">Uploading…</p>
+          </div>
+          <div>
+            <button type="submit" id="upload-btn" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover">Upload &amp; transcribe</button>
+          </div>
+        </form>
+      {% else %}
+        <p class="mt-2 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3 text-sm">{{ recording_reason }}</p>
+      {% endif %}
+    {% endcall %}
+
+    {% if turns %}
+      {% call card("Transcript") %}
+        <ol class="mt-2 space-y-3">
+          {% for turn in turns %}
+            <li class="text-sm">
+              <p><strong class="font-semibold">{{ turn.name }}</strong>
+                <span class="text-xs tabular-nums text-muted">{{ "%02d:%02d" % (turn.start_ms // 60000, (turn.start_ms // 1000) % 60) }}</span></p>
+              <p class="mt-0.5 leading-relaxed">{{ turn.text }}</p>
+            </li>
+          {% endfor %}
+        </ol>
+        <form method="post" action="{{ url_for('cases.session_room_swap_speakers', booking_id=booking.id) }}" class="mt-4">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-ink shadow-sm hover:border-muted">Swap speakers</button>
+        </form>
+      {% endcall %}
+    {% endif %}
+  </div>
+
+  <div class="lg:col-span-2 lg:sticky lg:top-20">
+    <h2 class="mb-4 font-display text-xl font-semibold tracking-tight">Pipeline</h2>
+    {% call card() %}
+      <ol id="steps" class="space-y-1">
+        {% for step in steps %}
+          <li class="flex gap-3 rounded-lg px-2 py-2 text-sm" data-step="{{ step.event }}">
+            <span class="step-dot mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-brand' if step.done else 'bg-border' }}"></span>
+            <span class="min-w-0 flex-1">
+              <span class="block font-medium">{{ {"audio_received": "Audio received", "transcribed": "Transcribed", "notes_drafted": "Notes drafted", "notes_reviewed": "Notes reviewed", "pdf_built": "PDF built", "email_sent": "Email sent"}[step.event] }}</span>
+            </span>
+          </li>
+        {% endfor %}
+      </ol>
+      <p id="room-note" class="mt-2 border-t border-border px-2 pt-3 text-xs text-muted">
+        {% if record and record.status == "error" %}Run failed.{% else %}Live: updating every 2 seconds.{% endif %}
+      </p>
+    {% endcall %}
+    {% call card() %}
+      <ol id="timeline" class="space-y-1" aria-live="polite" data-after="{{ events[-1].seq if events else 0 }}">
+        {% for event in events %}
+          <li class="flex gap-3 rounded-lg px-2 py-2 text-sm">
+            <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-danger' if event.status == 'error' else 'bg-brand' }}"></span>
+            <span class="min-w-0 flex-1">
+              <span class="block font-medium">{{ event.label }}</span>
+              <span class="block text-xs tabular-nums text-muted">{{ event.created_at.strftime("%H:%M:%S") }}</span>
+            </span>
+          </li>
+        {% endfor %}
+      </ol>
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/recorder.js') }}"></script>
+<script>
+  (function () {
+    var list = document.getElementById('timeline');
+    var note = document.getElementById('room-note');
+    var after = parseInt(list.getAttribute('data-after') || '0', 10);
+    var url = window.location.pathname + '/events';
+
+    function markStep(type) {
+      var li = document.querySelector('li[data-step="' + type + '"] .step-dot');
+      if (li) { li.classList.remove('bg-border'); li.classList.add('bg-brand'); }
+    }
+    function poll() {
+      fetch(url + '?after=' + after, {headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          (data.events || []).forEach(function (ev) {
+            var li = document.createElement('li');
+            li.className = 'flex gap-3 rounded-lg px-2 py-2 text-sm';
+            var dot = document.createElement('span');
+            dot.className = 'mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full '
+              + (ev.status === 'error' ? 'bg-danger' : 'bg-brand');
+            var wrap = document.createElement('span');
+            wrap.className = 'min-w-0 flex-1';
+            var title = document.createElement('span');
+            title.className = 'block font-medium';
+            title.textContent = ev.label;
+            wrap.appendChild(title);
+            li.appendChild(dot);
+            li.appendChild(wrap);
+            list.appendChild(li);
+            markStep(ev.type);
+            if (ev.seq > after) { after = ev.seq; }
+          });
+          if (data.status === 'emailed' || data.status === 'error') {
+            note.textContent = 'Run finished. Reloading…';
+            window.location.reload();
+          } else {
+            window.setTimeout(poll, 2000);
+          }
+        })
+        .catch(function () { window.setTimeout(poll, 4000); });
+    }
+    window.setTimeout(poll, 2000);
+
+    var form = document.getElementById('audio-form');
+    if (!form) { return; }
+    var recordBtn = document.getElementById('record-btn');
+    var stopBtn = document.getElementById('stop-btn');
+    var timer = document.getElementById('rec-timer');
+    var status = document.getElementById('rec-status');
+    var fileInput = document.getElementById('audio-file');
+    var progress = document.getElementById('upload-progress');
+    var bar = document.getElementById('upload-bar');
+    var progressLabel = document.getElementById('upload-label');
+    var recordedBlob = null;
+    var lastElapsed = 0;
+
+    function fmt(total) {
+      var s = Math.floor(total);
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      return pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+    }
+    var rec = new MentoraRecorder({
+      onTick: function (elapsed, max) {
+        lastElapsed = elapsed;
+        timer.textContent = fmt(elapsed) + ' / ' + fmt(max);
+      },
+      onStop: function (blob, reason) {
+        recordedBlob = blob;
+        recordBtn.disabled = false;
+        stopBtn.disabled = true;
+        status.textContent = 'Recorded ' + fmt(lastElapsed) + ' — ready to upload (' + reason + '). '
+          + Math.round((blob ? blob.size : 0) / 1024) + ' KB captured.';
+        fileInput.value = '';
+      },
+      onError: function (err) { status.textContent = 'Recording failed: ' + err.message; }
+    });
+    recordBtn.addEventListener('click', function () {
+      recordedBlob = null;
+      recordBtn.disabled = true;
+      stopBtn.disabled = false;
+      status.textContent = 'Recording… speak now.';
+      rec.start().catch(function (err) {
+        recordBtn.disabled = false;
+        stopBtn.disabled = true;
+        status.textContent = 'Recording failed: ' + err.message;
+      });
+    });
+    stopBtn.addEventListener('click', function () { rec.stop(); });
+    fileInput.addEventListener('change', function () {
+      recordedBlob = null;
+      var file = fileInput.files[0];
+      if (!file) { return; }
+      if (!/\.wav$/i.test(file.name)) {
+        status.textContent = 'That file is not a WAV. The transcriber accepts WAV only.';
+        fileInput.value = '';
+        return;
+      }
+      if (file.size > 32 * 1024 * 1024) {
+        status.textContent = 'That file exceeds the 32 MB per-request limit.';
+        fileInput.value = '';
+        return;
+      }
+      status.textContent = file.name + ' selected (' + Math.round(file.size / 1024) + ' KB).';
+    });
+    form.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var consent = document.getElementById('consent');
+      if (!consent.checked) {
+        status.textContent = 'Tick the consent checkbox first.';
+        return;
+      }
+      var payload = recordedBlob;
+      var name = 'session-recording.wav';
+      if (!payload && fileInput.files[0]) {
+        payload = fileInput.files[0];
+        name = payload.name;
+      }
+      if (!payload) {
+        status.textContent = 'Record audio or choose a WAV file first.';
+        return;
+      }
+      var data = new FormData();
+      data.append('csrf_token', form.querySelector('input[name="csrf_token"]').value);
+      data.append('consent', 'yes');
+      data.append('audio', payload, name);
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action);
+      xhr.upload.onprogress = function (e) {
+        if (!e.lengthComputable) { return; }
+        progress.classList.remove('hidden');
+        var pct = Math.round((e.loaded / e.total) * 100);
+        bar.style.width = pct + '%';
+        progressLabel.textContent = 'Uploading… ' + pct + '%';
+      };
+      xhr.onload = function () { window.location.reload(); };
+      xhr.onerror = function () { status.textContent = 'Upload failed; please retry.'; };
+      progress.classList.remove('hidden');
+      xhr.send(data);
+    });
+  })();
+</script>
+{% endblock %}

@@ -53,6 +53,9 @@
     <div><dt class="text-muted">Messages</dt>
       <dd><a href="{{ url_for('inbox.thread', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Message professor →</a></dd>
     </div>
+    <div><dt class="text-muted">Session room</dt>
+      <dd><a href="{{ url_for('cases.session_room', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Open session room →</a></dd>
+    </div>
   </dl>
   {% if booking.status == "requested" %}
     <form method="post" action="{{ url_for('cases.student_cancel', booking_id=booking.id) }}" class="mt-5 border-t border-border pt-4">

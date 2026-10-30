@@ -47,8 +47,10 @@ class Config:
     SESSION_COOKIE_SAMESITE: str = "Lax"
     SESSION_COOKIE_SECURE: bool = _get_bool("SESSION_COOKIE_SECURE")
 
-    # 10 MB file cap enforced in code; Flask-level cap adds form overhead.
-    MAX_CONTENT_LENGTH: int = 10 * 1024 * 1024 + 512 * 1024
+    # 20 MB Flask-level cap: a 9:30 session WAV is ~18 MB. Document
+    # uploads keep their own 10 MB cap enforced in code (extraction).
+    MAX_CONTENT_LENGTH: int = 20 * 1024 * 1024
+    DEMO_ALLOW_ANYTIME: bool = _get_bool("DEMO_ALLOW_ANYTIME")
     UPLOAD_FOLDER: str = _get("UPLOAD_FOLDER") or str(_PROJECT_ROOT / "uploads")
     DIAGNOSIS_MODE: str = _get("DIAGNOSIS_MODE") or "parallel"
     MATCH_MODE: str = _get("MATCH_MODE") or "fast"

@@ -93,6 +93,7 @@ app/
     diagnosis.py     parallel/single diagnosis, grounding, intake pipeline
     matching.py      professor tools, ranking, validation, match runner
     clarification.py one-round questions, answer constraints, relaxation
+    sessions.py      session room backend: slot gating, pipeline worker
     slots.py         60-minute slot grid (UTC store, WAT display)
     booking.py       race-safe booking creation, Jitsi links, demo refs
     booking_workflow.py request state machine, transitions, expiry

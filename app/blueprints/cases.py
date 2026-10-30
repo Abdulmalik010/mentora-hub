@@ -16,7 +16,7 @@ from flask import Flask
 from ..extensions import db
 from ..models import (
     Booking, CaseFile, ClarificationQA, Document, MatchResult,
-    ProfessorProfile, RunEvent, User,
+    ProfessorProfile, RunEvent, SessionRecord, User,
 )
 from ..security import current_user, login_required, role_required
 from ..services.booking import (
@@ -43,6 +43,18 @@ from ..services.email_service import (
 )
 from ..services.messaging import get_threads, unread_message_count
 from ..services.notifications import notify_transition
+from ..services.sessions import (
+    STEP_EVENTS,
+    get_session_record,
+    mapped_turns,
+    new_run_id,
+    recording_allowed,
+    reset_record_for_upload,
+    run_session_pipeline,
+    save_session_audio,
+    swap_speaker_map,
+)
+from ..services.transcription import AudioRejected
 from ..services.wallet import demo_balance
 from ..services.extraction import ExtractionError, save_upload, validate_upload
 from ..services.matching import get_case_matches
@@ -318,6 +330,15 @@ def _launch_matching(app: Flask, case_id: int, run_id: str) -> None:
     thread.start()
 
 
+def _launch_session_pipeline(app: Flask, booking_id: int, run_id: str) -> None:
+    """Start session transcription in a daemon thread (monkeypatched)."""
+    thread = threading.Thread(
+        target=run_session_pipeline, args=(app, booking_id, run_id),
+        daemon=True,
+    )
+    thread.start()
+
+
 @bp.post("/cases/new")
 @role_required("student")
 def create_case() -> Response | tuple[str, int]:
@@ -513,9 +534,12 @@ def events(case_id: int) -> Response:
 
 @bp.app_errorhandler(413)
 def too_large(error: Any) -> Response:
-    """Oversized bodies bounce back to the intake form with an explanation."""
-    flash("Upload too large: the limit is 10 MB per file.", "error")
-    return redirect(url_for("cases.new_form"))
+    """Oversized bodies bounce back to the sending page with an explanation."""
+    flash("Upload too large for the server to accept.", "error")
+    target = request.referrer or url_for("cases.new_form")
+    if not target.startswith("/"):
+        target = url_for("cases.new_form")
+    return redirect(target)
 
 
 def _matched_professor_or_404(
@@ -574,6 +598,19 @@ def _own_professor_booking_or_404(booking_id: int) -> Booking:
     booking = db.session.get(Booking, booking_id)
     user = current_user()
     if booking is None or user is None or booking.professor_id != user.id:
+        abort(404)
+    return booking
+
+
+def _own_party_booking_or_404(booking_id: int) -> Booking:
+    """Booking where the current user is the student or the professor."""
+    booking = db.session.get(Booking, booking_id)
+    user = current_user()
+    if (
+        booking is None
+        or user is None
+        or user.id not in (booking.student_id, booking.professor_id)
+    ):
         abort(404)
     return booking
 
@@ -744,6 +781,137 @@ def session_detail(booking_id: int) -> str:
         professor=professor,
         case=case,
     )
+
+
+@bp.get("/sessions/<int:booking_id>/room")
+@login_required
+def session_room(booking_id: int) -> str:
+    """Session room: meeting link, recording panel, 6-step timeline.
+
+    Visible to the booking's student and professor. The recording panel
+    is gated on the slot window (DEMO_ALLOW_ANYTIME skips the check);
+    the meeting link follows the accepted-only reveal rule.
+    """
+    booking = _own_party_booking_or_404(booking_id)
+    record = get_session_record(booking.id)
+    events: list[RunEvent] = []
+    if record is not None and record.run_id:
+        events = (
+            RunEvent.query.filter_by(run_id=record.run_id)
+            .order_by(RunEvent.seq)
+            .all()
+        )
+    done_types = {event.type for event in events}
+    steps = [
+        {"event": name, "done": name in done_types} for name in STEP_EVENTS
+    ]
+    allowed, reason = recording_allowed(
+        booking, demo_anytime=bool(current_app.config.get("DEMO_ALLOW_ANYTIME"))
+    )
+    student = db.session.get(User, booking.student_id)
+    professor = db.session.get(User, booking.professor_id)
+    return render_template(
+        "sessions/room.html",
+        booking=booking, record=record, events=events, steps=steps,
+        student=student, professor=professor,
+        recording_allowed=allowed, recording_reason=reason,
+        turns=mapped_turns(record) if record is not None else [],
+    )
+
+
+@bp.get("/sessions/<int:booking_id>/room/events")
+@login_required
+def session_room_events(booking_id: int) -> Response:
+    """Pollable room timeline (JSON, `?after=seq`)."""
+    booking = _own_party_booking_or_404(booking_id)
+    record = get_session_record(booking.id)
+    after = request.args.get("after", 0, type=int)
+    rows: list[RunEvent] = []
+    if record is not None and record.run_id:
+        rows = (
+            RunEvent.query.filter_by(run_id=record.run_id)
+            .filter(RunEvent.seq > after)
+            .order_by(RunEvent.seq)
+            .all()
+        )
+    return jsonify(
+        {
+            "status": record.status if record is not None else "pending",
+            "events": [
+                {
+                    "seq": event.seq,
+                    "type": event.type,
+                    "label": event.label,
+                    "status": event.status,
+                    "created_at": event.created_at.isoformat(),
+                }
+                for event in rows
+            ],
+        }
+    )
+
+
+@bp.post("/sessions/<int:booking_id>/room/audio")
+@login_required
+def session_room_audio(booking_id: int) -> Response:
+    """Accept a consented WAV upload and launch the pipeline worker."""
+    booking = _own_party_booking_or_404(booking_id)
+    allowed, reason = recording_allowed(
+        booking, demo_anytime=bool(current_app.config.get("DEMO_ALLOW_ANYTIME"))
+    )
+    if not allowed:
+        flash(reason, "error")
+        return redirect(
+            url_for("cases.session_room", booking_id=booking.id), code=303
+        )
+    if request.form.get("consent") != "yes":
+        flash("Recording needs your explicit consent: tick the checkbox.", "error")
+        return redirect(
+            url_for("cases.session_room", booking_id=booking.id), code=303
+        )
+    upload = request.files.get("audio")
+    if upload is None or not (upload.filename or "").strip():
+        flash("Choose a WAV file (or record one) first.", "error")
+        return redirect(
+            url_for("cases.session_room", booking_id=booking.id), code=303
+        )
+    try:
+        path = save_session_audio(
+            upload.filename or "", upload.read(),
+            current_app.config["UPLOAD_FOLDER"],
+        )
+    except AudioRejected as exc:
+        flash(str(exc), "error")
+        return redirect(
+            url_for("cases.session_room", booking_id=booking.id), code=303
+        )
+    record = get_session_record(booking.id)
+    if record is None:
+        record = SessionRecord(booking_id=booking.id)
+        db.session.add(record)
+    run_id = new_run_id()
+    reset_record_for_upload(record, path, run_id)
+    db.session.commit()
+    _launch_session_pipeline(current_app, booking.id, run_id)
+    flash("Audio received; transcription started.", "success")
+    return redirect(url_for("cases.session_room", booking_id=booking.id), code=303)
+
+
+@bp.post("/sessions/<int:booking_id>/room/speakers/swap")
+@login_required
+def session_room_swap_speakers(booking_id: int) -> Response:
+    """Flip the Professor/Student speaker mapping (one click)."""
+    booking = _own_party_booking_or_404(booking_id)
+    record = get_session_record(booking.id)
+    if record is None or not record.speaker_map:
+        flash("Nothing to swap yet: transcribe audio first.", "error")
+        return redirect(
+            url_for("cases.session_room", booking_id=booking.id), code=303
+        )
+    record.speaker_map = swap_speaker_map(record.speaker_map)
+    db.session.commit()
+    flash("Speaker roles swapped.", "success")
+    return redirect(url_for("cases.session_room", booking_id=booking.id), code=303)
 
 
 @bp.post("/sessions/<int:booking_id>/cancel")

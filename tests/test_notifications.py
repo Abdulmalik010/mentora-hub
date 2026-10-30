@@ -162,13 +162,16 @@ def test_expiry_notifies_student(app: Flask) -> None:
     assert Notification.query.filter_by(user_id=booking.student_id).count() == 1
 
 
-def test_cancel_and_answers_stay_silent(app: Flask) -> None:
-    """Cancels and proposal answers send no notifications (spec: 5 events)."""
+def test_cancel_and_answers_notify_professor(app: Flask) -> None:
+    """Cancels and proposal answers ping the professor (4.2 Part E)."""
     booking = seed_request(datetime(2026, 11, 4, 9, 0))
     client = app.test_client()
     login_sample_student(client)
     client.post(f"/sessions/{booking.id}/cancel")
-    assert Notification.query.count() == 0
+    cancelled = Notification.query.filter_by(
+        user_id=booking.professor_id, kind="cancelled"
+    ).all()
+    assert len(cancelled) == 1
 
     other = seed_request(datetime(2026, 11, 18, 9, 0))
     login_professor(client, 12)
@@ -177,8 +180,8 @@ def test_cancel_and_answers_stay_silent(app: Flask) -> None:
         f"/dashboard/bookings/{other.id}/propose",
         data={"new_slot": new_slot.key},
     )
-    assert Notification.query.count() == 1  # the proposal itself
+    assert Notification.query.count() == 2  # cancel + the proposal itself
     login_sample_student(client)
     client.post(f"/sessions/{other.id}/proposal/accept")
-    assert Notification.query.count() == 1  # the answer is silent
+    assert Notification.query.count() == 3  # the answer pings the professor
     assert db.session.get(Booking, other.id).status == "accepted"

@@ -12,6 +12,9 @@ KIND_ACCEPTED = "accepted"
 KIND_DECLINED = "declined"
 KIND_PROPOSAL = "proposal"
 KIND_EXPIRED = "expired"
+KIND_CANCELLED = "cancelled"
+KIND_PROPOSAL_ACCEPTED = "proposal_accepted"
+KIND_PROPOSAL_DECLINED = "proposal_declined"
 KIND_NEW_MESSAGE = "new_message"
 
 MESSAGE_NOTIFY_BATCH = timedelta(minutes=10)
@@ -49,11 +52,11 @@ def mark_all_read(user_id: int) -> int:
 
 
 def notify_transition(booking_id: int, event: str) -> Notification | None:
-    """Emit the inbox notification for one booking event (spec: 5 events).
+    """Emit the inbox notification for one booking event.
 
     Request creation notifies the professor; accept/decline/proposal/expiry
-    notify the student. Cancels and proposal answers stay silent. Returns
-    None when the booking or its parties are gone.
+    notify the student; student cancels and proposal answers notify the
+    professor. Returns None when the booking or its parties are gone.
     """
     booking = db.session.get(Booking, booking_id)
     if booking is None:
@@ -98,6 +101,30 @@ def notify_transition(booking_id: int, event: str) -> Notification | None:
         return notify(
             student.id, KIND_EXPIRED, "Your request expired",
             f"{slot} · the demo hold was released", session_url,
+        )
+    case_file_url = f"/dashboard/bookings/{booking.id}"
+    if event == "cancelled":
+        return notify(
+            professor.id, KIND_CANCELLED,
+            f"{student.display_name} cancelled the request",
+            f"{slot} · the slot is free again", case_file_url,
+        )
+    if event == "proposal_accepted":
+        new = (
+            format_wat(booking.scheduled_at)
+            if booking.scheduled_at
+            else "—"
+        )
+        return notify(
+            professor.id, KIND_PROPOSAL_ACCEPTED,
+            f"{student.display_name} accepted your new time",
+            f"{new} · meeting link revealed", case_file_url,
+        )
+    if event == "proposal_declined":
+        return notify(
+            professor.id, KIND_PROPOSAL_DECLINED,
+            f"{student.display_name} declined your new time",
+            f"{slot} · the request is cancelled", case_file_url,
         )
     raise ValueError(f"unknown booking event: {event}")
 

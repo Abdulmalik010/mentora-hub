@@ -9,7 +9,8 @@ import pytest
 from flask import Flask
 
 from app.extensions import db
-from app.models import Booking, ProfessorProfile, User
+from app.models import Booking, EmailLog, Notification, ProfessorProfile, User
+from app.services.email_service import KIND_CANCELLED_PROFESSOR
 from app.services.booking import (
     ACTIVE_STATUSES,
     STATUS_ACCEPTED,
@@ -517,3 +518,76 @@ def test_lazy_expiry_on_read(app: Flask) -> None:
     db.session.refresh(booking)
     assert booking.status == STATUS_EXPIRED
     assert booking.payment_status == "released"
+
+
+def test_cancel_notifies_and_emails_professor(app: Flask) -> None:
+    """Student cancel pings the professor in-app and sends one email."""
+    booking = seed_request()
+    professor = db.session.get(User, booking.professor_id)
+    assert professor is not None
+    client = app.test_client()
+    login_sample_student(client)
+    response = client.post(f"/sessions/{booking.id}/cancel")
+    assert response.status_code == 303
+    note = Notification.query.filter_by(
+        user_id=professor.id, kind="cancelled"
+    ).one()
+    assert note.url == f"/dashboard/bookings/{booking.id}"
+    assert "cancelled" in note.title
+    log = EmailLog.query.filter_by(
+        booking_id=booking.id, kind=KIND_CANCELLED_PROFESSOR
+    ).one()
+    assert log.recipient == professor.email
+
+
+def test_cancel_retry_sends_nothing_twice(app: Flask) -> None:
+    """A second cancel POST fails the transition, emitting no pings."""
+    booking = seed_request()
+    client = app.test_client()
+    login_sample_student(client)
+    client.post(f"/sessions/{booking.id}/cancel")
+    retry = client.post(
+        f"/sessions/{booking.id}/cancel", follow_redirects=True
+    )
+    assert retry.status_code == 200
+    assert Notification.query.filter_by(
+        user_id=booking.professor_id, kind="cancelled"
+    ).count() == 1
+    assert EmailLog.query.filter_by(
+        booking_id=booking.id, kind=KIND_CANCELLED_PROFESSOR
+    ).count() == 1
+
+
+def test_proposal_answers_notify_professor_without_email(app: Flask) -> None:
+    """Accepting/declining a proposal notifies in-app only (no email)."""
+    accepted = seed_request(datetime(2026, 11, 4, 9, 0))
+    declined = seed_request(datetime(2026, 11, 11, 9, 0))
+    professor = db.session.get(User, accepted.professor_id)
+    assert professor is not None
+    apply_transition(
+        accepted.id, "propose", actor_user=professor,
+        new_start=datetime(2026, 11, 5, 10, 0),
+    )
+    apply_transition(
+        declined.id, "propose", actor_user=professor,
+        new_start=datetime(2026, 11, 12, 10, 0),
+    )
+    client = app.test_client()
+    login_sample_student(client)
+    assert client.post(
+        f"/sessions/{accepted.id}/proposal/accept"
+    ).status_code == 303
+    assert client.post(
+        f"/sessions/{declined.id}/proposal/decline"
+    ).status_code == 303
+    yes = Notification.query.filter_by(
+        user_id=professor.id, kind="proposal_accepted"
+    ).one()
+    assert yes.url == f"/dashboard/bookings/{accepted.id}"
+    no = Notification.query.filter_by(
+        user_id=professor.id, kind="proposal_declined"
+    ).one()
+    assert no.url == f"/dashboard/bookings/{declined.id}"
+    assert EmailLog.query.filter(
+        EmailLog.booking_id.in_((accepted.id, declined.id))
+    ).count() == 0

@@ -36,6 +36,7 @@ from ..services.diagnosis import run_case_pipeline
 from ..services.email_service import (
     case_file_context,
     send_accepted_emails,
+    send_cancelled_email,
     send_declined_email,
     send_request_emails,
 )
@@ -657,6 +658,12 @@ def student_cancel(booking_id: int) -> Response:
         flash(str(exc), "error")
     else:
         flash("Request cancelled. The demo hold was released.", "success")
+        try:
+            notify_transition(booking.id, "cancelled")
+            send_cancelled_email(booking.id)
+        except Exception:  # noqa: BLE001 — never undo the decision
+            current_app.logger.exception("cancel notifications failed")
+            flash("Cancelled, but notifications could not be sent.", "error")
     return redirect(
         url_for("cases.session_detail", booking_id=booking.id), code=303
     )
@@ -678,6 +685,11 @@ def student_accept_proposal(booking_id: int) -> Response:
         flash(str(exc), "error")
     else:
         flash("New time accepted. The meeting link is on this page.", "success")
+        try:
+            notify_transition(booking.id, "proposal_accepted")
+        except Exception:  # noqa: BLE001 — never undo the decision
+            current_app.logger.exception("proposal-answer notification failed")
+            flash("Accepted, but the notification could not be sent.", "error")
     return redirect(
         url_for("cases.session_detail", booking_id=booking.id), code=303
     )
@@ -699,6 +711,11 @@ def student_decline_proposal(booking_id: int) -> Response:
         flash(str(exc), "error")
     else:
         flash("Proposal declined. The demo hold was released.", "success")
+        try:
+            notify_transition(booking.id, "proposal_declined")
+        except Exception:  # noqa: BLE001 — never undo the decision
+            current_app.logger.exception("proposal-answer notification failed")
+            flash("Declined, but the notification could not be sent.", "error")
     return redirect(
         url_for("cases.session_detail", booking_id=booking.id), code=303
     )

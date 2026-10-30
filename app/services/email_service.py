@@ -32,6 +32,7 @@ KIND_REQUEST_STUDENT = "request_received_student"
 KIND_CONFIRMED_PROFESSOR = "booking_confirmed_professor"
 KIND_CONFIRMED_STUDENT = "booking_confirmed_student"
 KIND_DECLINED_STUDENT = "booking_declined_student"
+KIND_CANCELLED_PROFESSOR = "booking_cancelled_professor"
 KIND_MESSAGE_BASE = "new_message"
 
 MESSAGE_EMAIL_BATCH = timedelta(hours=1)
@@ -640,6 +641,52 @@ def send_declined_email(booking_id: int) -> EmailLog | None:
         booking_id=booking.id,
         kind=KIND_DECLINED_STUDENT,
         email=build_declined_email(
+            booking=booking, professor=professor, student=student
+        ),
+    )
+
+
+def build_cancelled_email(
+    *, booking: Booking, professor: User, student: User
+) -> OutgoingEmail:
+    """Professor notice: the student withdrew the request; slot freed."""
+    slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
+    text = "\n".join(
+        [
+            f"{student.display_name} cancelled the session request for {slot}.",
+            "",
+            "The slot is free again and the demo hold was released; no action needed.",
+            "",
+            "Sent from the Mentora Academic Hub demo.",
+        ]
+    )
+    html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
+<div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+<strong>Request cancelled</strong>
+</div>
+<div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
+<p><strong>{html.escape(student.display_name)}</strong> cancelled the session request for <strong>{html.escape(slot)}</strong>.</p>
+<p>The slot is free again and the demo hold was released; no action needed.</p>
+<p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
+</div></div>"""
+    return OutgoingEmail(
+        to=professor.email,
+        subject=f"Request cancelled: {student.display_name} — {slot}",
+        text=text,
+        html_body=html_body,
+    )
+
+
+def send_cancelled_email(booking_id: int) -> EmailLog | None:
+    """Cancellation notice to the professor only (no student email)."""
+    parties = _booking_parties(booking_id)
+    if parties is None:
+        return None
+    booking, _case, professor, student = parties
+    return send_logged_email(
+        booking_id=booking.id,
+        kind=KIND_CANCELLED_PROFESSOR,
+        email=build_cancelled_email(
             booking=booking, professor=professor, student=student
         ),
     )

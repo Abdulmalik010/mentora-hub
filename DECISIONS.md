@@ -95,3 +95,5 @@
 - 2026-10-30: Availability format is {"days": [...], "windows": [["HH:MM","HH:MM"], ...]}; the legacy "hours" string still parses via a fallback, but the editor only writes windows (whole-hour, non-overlapping; one shared window set for all days).
 - 2026-10-30: search_professors skips accepting_new=False, so matching and the directory exclude opt-outs; direct profile URLs still render with a "Not accepting requests" badge.
 - 2026-10-30: Professor registration creates a bare profile and redirects to /profile/setup; self-registered professors (is_sample=False) show a "Self-registered" badge and "(demo)" pricing instead of sample labels.
+- 2026-10-30: Student cancels and proposal answers now notify the professor in-app (cancelled/proposal_accepted/proposal_declined); only the cancel action emails the professor (booking_cancelled_professor) — proposal answers stay email-silent.
+- 2026-10-30: Part E needs no fresh dev DB (no schema change); .gitignore covers uploads/ and samples/audio/.

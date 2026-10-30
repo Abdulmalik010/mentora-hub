@@ -27,8 +27,11 @@ RESEND_API_URL = "https://api.resend.com/emails"
 RESEND_TIMEOUT_S = 30.0
 SEND_ATTEMPTS = 2  # initial try plus one retry
 
-KIND_CASE_FILE = "case_file_professor"
-KIND_CONFIRMATION = "booking_confirmation_student"
+KIND_REQUEST_PROFESSOR = "session_request_professor"
+KIND_REQUEST_STUDENT = "request_received_student"
+KIND_CONFIRMED_PROFESSOR = "booking_confirmed_professor"
+KIND_CONFIRMED_STUDENT = "booking_confirmed_student"
+KIND_DECLINED_STUDENT = "booking_declined_student"
 
 DEFAULT_FROM = "onboarding@resend.dev"
 STATUS_SENT = "sent"
@@ -276,9 +279,19 @@ def case_file_context(case: CaseFile) -> dict[str, Any]:
 
 
 def build_case_file_email(
-    *, booking: Booking, case: CaseFile, professor: User, student: User
+    *,
+    booking: Booking,
+    case: CaseFile,
+    professor: User,
+    student: User,
+    review_url: str | None = None,
 ) -> OutgoingEmail:
-    """Professor case file: diagnosis brief, evidence, questions, agenda."""
+    """Professor case file: diagnosis brief, evidence, questions, agenda.
+
+    With ``review_url`` this is the session-request email: it links to the
+    review page instead of the meeting link, which stays hidden until the
+    professor accepts.
+    """
     ctx = case_file_context(case)
     gaps = ctx["gaps"]
     questions = ctx["questions"]
@@ -320,7 +333,11 @@ def build_case_file_email(
         "\n".join(f"- {item}" for item in agenda),
         "",
         f"Session: {slot} · 60 minutes",
-        f"Meeting link: {meeting}",
+        *(
+            [f"Review request: {review_url}"]
+            if review_url
+            else [f"Meeting link: {meeting}"]
+        ),
         "",
         "Sent from the Mentora Academic Hub demo.",
     ]
@@ -345,6 +362,13 @@ def build_case_file_email(
             "<ul>" + "".join(f"<li>{html.escape(str(i))}</li>" for i in items) + "</ul>"
         )
 
+    if review_url:
+        target = html.escape(review_url)
+        session_link_html = f'Review request: <a href="{target}">{target}</a>'
+    else:
+        target = html.escape(meeting)
+        session_link_html = f'Meeting link: <a href="{target}">{target}</a>'
+
     html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
 <div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
 <strong>Mentora Academic Hub — case file for {html.escape(student.display_name)}</strong>
@@ -362,13 +386,14 @@ def build_case_file_email(
 {list_html(agenda, "")}
 <h2>Session</h2>
 <p>{html.escape(slot)} · 60 minutes<br>
-Meeting link: <a href="{html.escape(meeting)}">{html.escape(meeting)}</a></p>
+{session_link_html}</p>
 <p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.
 {"[SAMPLE DATA] Synthetic demo content; not a real person." if student.is_sample or professor.is_sample else ""}</p>
 </div></div>"""
+    subject_kind = "session request" if review_url else "case file"
     return OutgoingEmail(
         to=professor.email,
-        subject=f"Mentora case file: {student.display_name} — {slot}",
+        subject=f"Mentora {subject_kind}: {student.display_name} — {slot}",
         text="\n".join(text_lines),
         html_body=html_body,
     )
@@ -377,16 +402,19 @@ Meeting link: <a href="{html.escape(meeting)}">{html.escape(meeting)}</a></p>
 def build_confirmation_email(
     *, booking: Booking, professor: User, student: User
 ) -> OutgoingEmail:
-    """Student receipt: who, when (WAT), meeting link, demo receipt ref."""
+    """Student receipt: who, when (WAT), meeting link, demo receipt ref.
+
+    Sent only once the professor accepts, so the meeting link is final.
+    """
     slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
     meeting = booking.meeting_url or "—"
     text = "\n".join(
         [
-            f"Your session with {professor.display_name} is booked.",
+            f"Your session with {professor.display_name} is confirmed.",
             "",
             f"When: {slot} · 60 minutes",
             f"Meeting link: {meeting}",
-            f"Receipt: {booking.mock_payment_ref or '—'} (demo, nothing charged)",
+            f"Receipt: {booking.mock_payment_ref or '—'} (demo, captured)",
             "",
             "Your diagnosis was shared with the professor for preparation.",
             "",
@@ -395,62 +423,220 @@ def build_confirmation_email(
     )
     html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
 <div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
-<strong>Session booked</strong>
+<strong>Session confirmed</strong>
 </div>
 <div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
-<p>Your session with <strong>{html.escape(professor.display_name)}</strong> is booked.</p>
+<p>Your session with <strong>{html.escape(professor.display_name)}</strong> is confirmed.</p>
 <p>When: <strong>{html.escape(slot)}</strong> · 60 minutes<br>
 Meeting link: <a href="{html.escape(meeting)}">{html.escape(meeting)}</a><br>
-Receipt: {html.escape(booking.mock_payment_ref or "—")} (demo, nothing charged)</p>
+Receipt: {html.escape(booking.mock_payment_ref or "—")} (demo, captured)</p>
 <p>Your diagnosis was shared with the professor for preparation.</p>
 <p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
 </div></div>"""
     return OutgoingEmail(
         to=student.email,
-        subject=f"Session booked: {professor.display_name} — {slot}",
+        subject=f"Session confirmed: {professor.display_name} — {slot}",
         text=text,
         html_body=html_body,
     )
 
 
-def send_booking_emails(booking_id: int) -> list[EmailLog]:
-    """Case-file email plus student confirmation; never raises.
+def build_request_received_email(
+    *, booking: Booking, professor: User, student: User
+) -> OutgoingEmail:
+    """Student notice: the request is with the professor (no link yet)."""
+    slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
+    text = "\n".join(
+        [
+            f"Your session request is with {professor.display_name}.",
+            "",
+            f"When: {slot} · 60 minutes",
+            "They have up to 48 hours to accept, decline or propose a time.",
+            f"Receipt: {booking.mock_payment_ref or '—'} "
+            "(demo payment held, not charged)",
+            "",
+            "Sent from the Mentora Academic Hub demo.",
+        ]
+    )
+    html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
+<div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+<strong>Request received</strong>
+</div>
+<div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
+<p>Your session request is with <strong>{html.escape(professor.display_name)}</strong>.</p>
+<p>When: <strong>{html.escape(slot)}</strong> · 60 minutes<br>
+They have up to 48 hours to accept, decline or propose a time.<br>
+Receipt: {html.escape(booking.mock_payment_ref or "—")} (demo payment held, not charged)</p>
+<p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
+</div></div>"""
+    return OutgoingEmail(
+        to=student.email,
+        subject=f"Request received: {professor.display_name} — {slot}",
+        text=text,
+        html_body=html_body,
+    )
 
-    The case file goes out only with the student's consent flag. Every
-    outcome lands in EmailLog; unexpected errors propagate to the caller,
-    which must not let them break the booking.
-    """
+
+def build_confirmed_professor_email(
+    *, booking: Booking, student: User
+) -> OutgoingEmail:
+    """Professor receipt: the session they accepted, with the meeting link."""
+    slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
+    meeting = booking.meeting_url or "—"
+    text = "\n".join(
+        [
+            f"You accepted {student.display_name}'s session request.",
+            "",
+            f"When: {slot} · 60 minutes",
+            f"Meeting link: {meeting}",
+            "",
+            "Sent from the Mentora Academic Hub demo.",
+        ]
+    )
+    html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
+<div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+<strong>Session confirmed</strong>
+</div>
+<div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
+<p>You accepted <strong>{html.escape(student.display_name)}</strong>'s session request.</p>
+<p>When: <strong>{html.escape(slot)}</strong> · 60 minutes<br>
+Meeting link: <a href="{html.escape(meeting)}">{html.escape(meeting)}</a></p>
+<p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
+</div></div>"""
+    professor = db.session.get(User, booking.professor_id)
+    return OutgoingEmail(
+        to=professor.email if professor else "",
+        subject=f"Session confirmed: {student.display_name} — {slot}",
+        text=text,
+        html_body=html_body,
+    )
+
+
+def build_declined_email(
+    *, booking: Booking, professor: User, student: User
+) -> OutgoingEmail:
+    """Student notice: the request was declined, with the reason."""
+    slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
+    reason = booking.decline_reason or "No reason given."
+    text = "\n".join(
+        [
+            f"{professor.display_name} declined your session request.",
+            "",
+            f"When: {slot} · 60 minutes",
+            f"Reason: {reason}",
+            "Your demo payment hold was released; pick another time or match.",
+            "",
+            "Sent from the Mentora Academic Hub demo.",
+        ]
+    )
+    html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
+<div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+<strong>Request declined</strong>
+</div>
+<div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
+<p><strong>{html.escape(professor.display_name)}</strong> declined your session request.</p>
+<p>When: <strong>{html.escape(slot)}</strong> · 60 minutes<br>
+Reason: {html.escape(reason)}<br>
+Your demo payment hold was released; pick another time or match.</p>
+<p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
+</div></div>"""
+    return OutgoingEmail(
+        to=student.email,
+        subject=f"Request declined: {professor.display_name} — {slot}",
+        text=text,
+        html_body=html_body,
+    )
+
+
+def _booking_parties(
+    booking_id: int,
+) -> tuple[Booking, CaseFile | None, User, User] | None:
+    """Booking plus case/professor/student; None when anyone is missing."""
     booking = db.session.get(Booking, booking_id)
     if booking is None:
-        return []
+        return None
     case = (
         db.session.get(CaseFile, booking.case_id) if booking.case_id else None
     )
     professor = db.session.get(User, booking.professor_id)
     student = db.session.get(User, booking.student_id)
-    if case is None or professor is None or student is None:
+    if professor is None or student is None:
+        return None
+    return booking, case, professor, student
+
+
+def send_request_emails(booking_id: int, *, review_url: str) -> list[EmailLog]:
+    """Session-request email to the professor, receipt to the student.
+
+    The case file goes out only with the student's consent flag. Every
+    outcome lands in EmailLog; unexpected errors propagate to the caller,
+    which must not let them break the booking.
+    """
+    parties = _booking_parties(booking_id)
+    if parties is None:
         return []
+    booking, case, professor, student = parties
     logs = []
-    if booking.consent_share_diagnosis:
+    if booking.consent_share_diagnosis and case is not None:
         logs.append(
             send_logged_email(
                 booking_id=booking.id,
-                kind=KIND_CASE_FILE,
+                kind=KIND_REQUEST_PROFESSOR,
                 email=build_case_file_email(
                     booking=booking,
                     case=case,
                     professor=professor,
                     student=student,
+                    review_url=review_url,
                 ),
             )
         )
     logs.append(
         send_logged_email(
             booking_id=booking.id,
-            kind=KIND_CONFIRMATION,
-            email=build_confirmation_email(
+            kind=KIND_REQUEST_STUDENT,
+            email=build_request_received_email(
                 booking=booking, professor=professor, student=student
             ),
         )
     )
     return logs
+
+
+def send_accepted_emails(booking_id: int) -> list[EmailLog]:
+    """Confirmed emails to both sides, each carrying the meeting link."""
+    parties = _booking_parties(booking_id)
+    if parties is None:
+        return []
+    booking, _case, professor, student = parties
+    return [
+        send_logged_email(
+            booking_id=booking.id,
+            kind=KIND_CONFIRMED_PROFESSOR,
+            email=build_confirmed_professor_email(
+                booking=booking, student=student
+            ),
+        ),
+        send_logged_email(
+            booking_id=booking.id,
+            kind=KIND_CONFIRMED_STUDENT,
+            email=build_confirmation_email(
+                booking=booking, professor=professor, student=student
+            ),
+        ),
+    ]
+
+
+def send_declined_email(booking_id: int) -> EmailLog | None:
+    """Decline notice to the student, carrying the professor's reason."""
+    parties = _booking_parties(booking_id)
+    if parties is None:
+        return None
+    booking, _case, professor, student = parties
+    return send_logged_email(
+        booking_id=booking.id,
+        kind=KIND_DECLINED_STUDENT,
+        email=build_declined_email(
+            booking=booking, professor=professor, student=student
+        ),
+    )

@@ -25,6 +25,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     from .blueprints.auth import bp as auth_bp
     from .blueprints.bookings import bp as bookings_bp
     from .blueprints.cases import bp as cases_bp
+    from .blueprints.notifications import bp as notifications_bp
     from .blueprints.professors import bp as professors_bp
 
     app.register_blueprint(cases_bp)
@@ -32,6 +33,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(professors_bp, url_prefix="/professors")
     app.register_blueprint(bookings_bp, url_prefix="/bookings")
     app.register_blueprint(agent_bp, url_prefix="/agent")
+    app.register_blueprint(notifications_bp)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -40,10 +42,15 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
 
     @app.context_processor
     def inject_user() -> dict[str, object]:
-        """Expose the session user to every template as ``current_user``."""
+        """Expose the session user plus their unread notification count."""
         from .security import current_user
+        from .services.notifications import unread_count
 
-        return {"current_user": current_user()}
+        user = current_user()
+        return {
+            "current_user": user,
+            "unread_notifications": unread_count(user.id) if user else 0,
+        }
 
     @app.template_filter("ngn")
     def format_ngn(value: object) -> str:

@@ -22,6 +22,11 @@
           <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="font-medium text-muted hover:text-ink">Professors</a>
+        <a href="{{ url_for('notifications.inbox') }}" class="relative rounded-lg p-1.5 text-muted hover:text-ink" aria-label="Notifications">
+          {{ icon("bell", "h-5 w-5") }}
+          <span data-unread-count {% if not unread_notifications %}hidden{% endif %}
+              class="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-bold text-white">{{ unread_notifications }}</span>
+        </a>
         <details class="user-menu relative">
           <summary class="flex items-center gap-2 rounded-lg px-1 py-1" aria-label="Account menu">
             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-brand text-sm font-semibold text-white" aria-hidden="true">{{ current_user.display_name[0]|upper }}</span>
@@ -56,6 +61,7 @@
           <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="py-1">Professors</a>
+        <a href="{{ url_for('notifications.inbox') }}" class="py-1">Notifications{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a>
         <form method="post" action="{{ url_for('auth.logout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="py-1 text-left">Log out ({{ current_user.display_name }})</button>
@@ -96,6 +102,26 @@
     });
   })();
 </script>
+{% if current_user %}
+<script>
+  (function () {
+    function refreshUnread() {
+      fetch('{{ url_for("notifications.count") }}', {headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data) { return; }
+          document.querySelectorAll('[data-unread-count]').forEach(function (el) {
+            el.textContent = data.count;
+            if (data.count === 0) { el.setAttribute('hidden', ''); }
+            else { el.removeAttribute('hidden'); }
+          });
+        })
+        .catch(function () {});
+    }
+    window.setInterval(refreshUnread, 20000);
+  })();
+</script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

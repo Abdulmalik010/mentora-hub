@@ -78,3 +78,6 @@
 - 2026-10-30: Proposed slots must be future and unoccupied (checked, not grid-locked); proposal acceptance re-checks plus the index backstop.
 - 2026-10-30: Meeting links are minted at request time but revealed only when accepted (display gating, no second link).
 - 2026-10-30: Request expiry is a lazy sweep on booking reads plus a `flask expire-requests` CLI command; expiry releases slot and payment.
+- 2026-10-30: Notifications: Notification rows, nav bell with unread count polled every 20s, /notifications inbox plus mark-all-read; exactly 5 events (request to professor; accepted/declined/proposal/expired to student), cancels and answers silent.
+- 2026-10-30: Transition emails: session request (case file plus review link, no meeting link) and receipt at checkout; confirmed to both with the link on accept; declined with reason; same override/banner/idempotency rules.
+- 2026-10-30: User-driven notifies live in the views; the expiry notice lives in expire_booking so lazy, CLI and guard paths all emit it.

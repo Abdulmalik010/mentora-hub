@@ -27,6 +27,7 @@ from .booking import (
     STATUS_REQUESTED,
     SlotTakenError,
 )
+from .notifications import notify_transition
 
 Actor = Literal["professor", "student", "system"]
 
@@ -236,6 +237,8 @@ def expire_booking(booking_id: int, now: datetime | None = None) -> bool:
         )
     )
     db.session.commit()
+    if rowcount:
+        notify_transition(booking_id, "expired")
     return rowcount > 0
 
 

@@ -76,11 +76,12 @@ app/
   extensions.py      shared extensions (db)
   models.py          User, ProfessorProfile, StudentProfile, Document,
                      CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
-                     MatchResult, EmailLog, ToolCallLog
+                     MatchResult, EmailLog, Notification, ToolCallLog
   security.py        current_user, login_required, role_required
   blueprints/        auth (register/login/logout), cases (role dashboards,
                      intake, detail, events, booking, sessions, case file),
-                     professors (public directory), bookings, agent (health)
+                     professors (public directory), bookings, agent (health),
+                     notifications (inbox, unread count)
   templates/         base shell + design macros (_ui.html) + auth/case pages
   services/
     meta_client.py   Meta API: retries, structured output, run_tool_loop
@@ -91,6 +92,7 @@ app/
     booking.py       race-safe booking creation, Jitsi links, demo refs
     booking_workflow.py request state machine, transitions, expiry
     email_service.py Resend HTTPS or local outbox, case-file + confirmation
+    notifications.py inbox rows, unread counts, transition fan-out
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
 scripts/seed.py      idempotent synthetic seed (20 profs / 4 depts / 3 students)
@@ -103,7 +105,7 @@ samples/             synthetic thesis excerpts + expected.json (demo fixtures)
 eval/                30 generated matching-eval cases
 docs/eval/           eval reports (written by the eval scripts)
 tests/               pytest suite (smoke, auth, intake, parallel, matching,
-                     booking, email)
+                     booking, email, workflow, notifications, professor)
 ```
 
 ## Live API check
@@ -133,7 +135,10 @@ safe) and ends on a confirmation page. The session is then *requested*, not
 booked: the professor has 48 hours to accept, decline (reason required) or
 propose another time from the case-file page, and the student answers from
 Sessions. The meeting link appears only once accepted. Stale requests expire
-automatically on read, or sweep them with `flask expire-requests`. Emails
+automatically on read, or sweep them with `flask expire-requests`. Both sides
+get inbox notifications (nav bell, `/notifications`) and emails per state
+change: request + receipt at checkout, confirmed to both on accept, reasoned
+decline to the student. Emails
 default to the local `outbox/` provider (gitignored `.eml` files, never
 delivered). For real delivery set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`,
 and `DEMO_RECIPIENT_OVERRIDE` to your own inbox: the Resend sandbox only

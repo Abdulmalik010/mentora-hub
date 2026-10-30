@@ -32,7 +32,13 @@ from ..services.booking_workflow import (
     expire_stale_bookings,
 )
 from ..services.diagnosis import run_case_pipeline
-from ..services.email_service import case_file_context, send_booking_emails
+from ..services.email_service import (
+    case_file_context,
+    send_accepted_emails,
+    send_declined_email,
+    send_request_emails,
+)
+from ..services.notifications import notify_transition
 from ..services.extraction import ExtractionError, save_upload, validate_upload
 from ..services.matching import get_case_matches
 from ..services.slots import Slot, generate_slots, slot_from_key
@@ -172,6 +178,12 @@ def professor_accept(booking_id: int) -> Response:
             "Session accepted. The meeting link is now visible to both.",
             "success",
         )
+        try:
+            notify_transition(booking.id, "accepted")
+            send_accepted_emails(booking.id)
+        except Exception:  # noqa: BLE001 — never undo the decision
+            current_app.logger.exception("accept notifications failed")
+            flash("Accepted, but notifications could not be sent.", "error")
     return redirect(
         url_for("cases.professor_case_file", booking_id=booking.id), code=303
     )
@@ -196,6 +208,12 @@ def professor_decline(booking_id: int) -> Response:
         flash(str(exc), "error")
     else:
         flash("Request declined.", "success")
+        try:
+            notify_transition(booking.id, "declined")
+            send_declined_email(booking.id)
+        except Exception:  # noqa: BLE001 — never undo the decision
+            current_app.logger.exception("decline notifications failed")
+            flash("Declined, but notifications could not be sent.", "error")
     return redirect(
         url_for("cases.professor_case_file", booking_id=booking.id), code=303
     )
@@ -233,6 +251,11 @@ def professor_propose(booking_id: int) -> Response:
         flash(str(exc), "error")
     else:
         flash("Alternative proposed.", "success")
+        try:
+            notify_transition(booking.id, "proposal")
+        except Exception:  # noqa: BLE001 — never undo the decision
+            current_app.logger.exception("proposal notification failed")
+            flash("Proposed, but the notification could not be sent.", "error")
     return redirect(
         url_for("cases.professor_case_file", booking_id=booking.id), code=303
     )
@@ -511,10 +534,17 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
         return _render_book_form(case, professor, profile, match, 409)
     flash("Session requested.", "success")
     try:
-        send_booking_emails(booking.id)
-    except Exception:  # noqa: BLE001 — email must never break the booking
-        current_app.logger.exception("booking emails failed")
-        flash("Booked, but the notification emails could not be sent.", "error")
+        notify_transition(booking.id, "request_created")
+        send_request_emails(
+            booking.id,
+            review_url=url_for(
+                "cases.professor_case_file", booking_id=booking.id,
+                _external=True,
+            ),
+        )
+    except Exception:  # noqa: BLE001 — notify must never break the booking
+        current_app.logger.exception("booking notifications failed")
+        flash("Requested, but the notifications could not be sent.", "error")
     return redirect(
         url_for("cases.confirmation", booking_id=booking.id), code=303
     )

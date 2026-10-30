@@ -276,6 +276,25 @@ class EmailLog(db.Model):
     booking = db.relationship("Booking", foreign_keys=[booking_id])
 
 
+class Notification(db.Model):
+    """One inbox notification; read when ``read_at`` is set."""
+
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+    kind = db.Column(db.String(40), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    body = db.Column(db.String(500), nullable=False, default="")
+    url = db.Column(db.String(500), nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    read_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+
+
 class ToolCallLog(db.Model):
     """Audit row for every agent tool call (see ``run_tool_loop``)."""
 

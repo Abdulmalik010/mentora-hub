@@ -9,16 +9,23 @@ from flask import Flask
 
 from app.extensions import db
 from app.models import Booking, EmailLog, User
-from app.services import email_service
 from app.services.booking import create_booking
 from app.services.email_service import (
-    KIND_CASE_FILE,
-    KIND_CONFIRMATION,
+    KIND_CONFIRMED_PROFESSOR,
+    KIND_CONFIRMED_STUDENT,
+    KIND_DECLINED_STUDENT,
+    KIND_REQUEST_PROFESSOR,
+    KIND_REQUEST_STUDENT,
     OutgoingEmail,
     build_case_file_email,
     build_confirmation_email,
-    send_booking_emails,
+    build_confirmed_professor_email,
+    build_declined_email,
+    build_request_received_email,
+    send_accepted_emails,
+    send_declined_email,
     send_logged_email,
+    send_request_emails,
 )
 from tests.test_booking import login_sample_student, seed_booking_case
 
@@ -49,7 +56,7 @@ def test_outbox_writes_eml_and_logs_sent(app: Flask, tmp_path) -> None:  # type:
     """Outbox provider writes one .eml and logs it as sent."""
     booking = seed_booking()
     log = send_logged_email(
-        booking_id=booking.id, kind=KIND_CONFIRMATION, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT, email=EMAIL
     )
     assert log.status == "sent"
     assert log.provider == "outbox"
@@ -68,7 +75,7 @@ def test_override_redirects_with_banner(app: Flask, tmp_path, monkeypatch) -> No
     monkeypatch.setenv("DEMO_RECIPIENT_OVERRIDE", "demo-owner@example.org")
     booking = seed_booking()
     log = send_logged_email(
-        booking_id=booking.id, kind=KIND_CONFIRMATION, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT, email=EMAIL
     )
     assert log.status == "sent"
     assert log.recipient == "prof@example.com"  # original kept in the log
@@ -82,16 +89,16 @@ def test_send_is_idempotent_per_booking_and_kind(app: Flask, tmp_path) -> None: 
     """A repeat send returns the existing row and writes nothing new."""
     booking = seed_booking()
     first = send_logged_email(
-        booking_id=booking.id, kind=KIND_CONFIRMATION, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT, email=EMAIL
     )
     second = send_logged_email(
-        booking_id=booking.id, kind=KIND_CONFIRMATION, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT, email=EMAIL
     )
     assert first.id == second.id
     assert outbox_files(tmp_path) != []
     assert len(outbox_files(tmp_path)) == 1
     assert EmailLog.query.filter_by(
-        booking_id=booking.id, kind=KIND_CONFIRMATION
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT
     ).count() == 1
 
 
@@ -123,7 +130,7 @@ def test_resend_success_logs_provider_id(app: Flask, monkeypatch) -> None:  # ty
     booking = seed_booking()
     log = send_logged_email(
         booking_id=booking.id,
-        kind=KIND_CONFIRMATION,
+        kind=KIND_REQUEST_STUDENT,
         email=OutgoingEmail(
             to="real@example.org", subject="Hi", text="T", html_body="<p>T</p>"
         ),
@@ -150,7 +157,7 @@ def test_resend_retries_once_then_fails(app: Flask, monkeypatch) -> None:  # typ
     booking = seed_booking()
     log = send_logged_email(
         booking_id=booking.id,
-        kind=KIND_CONFIRMATION,
+        kind=KIND_REQUEST_STUDENT,
         email=OutgoingEmail(
             to="real@example.org", subject="Hi", text="T", html_body="<p>T</p>"
         ),
@@ -175,7 +182,7 @@ def test_resend_client_error_fails_fast(app: Flask, monkeypatch) -> None:  # typ
     booking = seed_booking()
     log = send_logged_email(
         booking_id=booking.id,
-        kind=KIND_CONFIRMATION,
+        kind=KIND_REQUEST_STUDENT,
         email=OutgoingEmail(
             to="real@example.org", subject="Hi", text="T", html_body="<p>T</p>"
         ),
@@ -194,13 +201,13 @@ def test_resend_refuses_sample_addresses(app: Flask, monkeypatch) -> None:  # ty
     )
     booking = seed_booking()
     refused = send_logged_email(
-        booking_id=booking.id, kind=KIND_CONFIRMATION, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT, email=EMAIL
     )
     assert refused.status == "refused"
     assert calls == []
     monkeypatch.setenv("DEMO_RECIPIENT_OVERRIDE", "demo-owner@example.org")
     allowed = send_logged_email(
-        booking_id=booking.id, kind=KIND_CASE_FILE, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_PROFESSOR, email=EMAIL
     )
     assert allowed.status == "sent"
     assert len(calls) == 1
@@ -211,7 +218,7 @@ def test_unknown_provider_is_refused(app: Flask, monkeypatch) -> None:  # type: 
     monkeypatch.setenv("EMAIL_PROVIDER", "pigeon")
     booking = seed_booking()
     log = send_logged_email(
-        booking_id=booking.id, kind=KIND_CONFIRMATION, email=EMAIL
+        booking_id=booking.id, kind=KIND_REQUEST_STUDENT, email=EMAIL
     )
     assert log.status == "refused"
     assert "pigeon" in (log.error or "")
@@ -275,14 +282,14 @@ def test_confirmation_content(app: Flask) -> None:
 
 
 def test_case_file_gated_on_consent(app: Flask) -> None:
-    """Without consent the case file stays home; confirmation still sends."""
+    """Without consent the case file stays home; the receipt still sends."""
     booking = seed_booking()
     booking.consent_share_diagnosis = False
     db.session.commit()
-    logs = send_booking_emails(booking.id)
-    assert [log.kind for log in logs] == [KIND_CONFIRMATION]
+    logs = send_request_emails(booking.id, review_url="http://test/review/1")
+    assert [log.kind for log in logs] == [KIND_REQUEST_STUDENT]
     assert EmailLog.query.filter_by(
-        booking_id=booking.id, kind=KIND_CASE_FILE
+        booking_id=booking.id, kind=KIND_REQUEST_PROFESSOR
     ).count() == 0
 
 
@@ -310,8 +317,73 @@ def test_booking_post_sends_both_emails(app: Flask, tmp_path) -> None:  # type: 
         row.kind: row.status
         for row in EmailLog.query.filter_by(booking_id=booking.id).all()
     }
-    assert kinds == {KIND_CASE_FILE: "sent", KIND_CONFIRMATION: "sent"}
+    assert kinds == {
+        KIND_REQUEST_PROFESSOR: "sent", KIND_REQUEST_STUDENT: "sent"
+    }
     assert len(outbox_files(tmp_path)) == 2
+
+
+def test_request_email_links_review_not_meeting(app: Flask) -> None:
+    """The request email carries the case file plus a review link, no link."""
+    booking = rich_case_booking(app)
+    case = booking.case
+    assert case is not None
+    professor = db.session.get(User, booking.professor_id)
+    student = db.session.get(User, booking.student_id)
+    assert professor is not None and student is not None
+    email = build_case_file_email(
+        booking=booking, case=case, professor=professor, student=student,
+        review_url="http://test/review/9",
+    )
+    assert "session request" in email.subject
+    assert "Review request: http://test/review/9" in email.text
+    assert (booking.meeting_url or "") not in email.text
+    assert "Weak identification strategy." in email.text
+
+
+def test_request_received_has_no_link(app: Flask) -> None:
+    """The student receipt promises 48h and a held payment, nothing more."""
+    booking = rich_case_booking(app)
+    professor = db.session.get(User, booking.professor_id)
+    student = db.session.get(User, booking.student_id)
+    assert professor is not None and student is not None
+    email = build_request_received_email(
+        booking=booking, professor=professor, student=student
+    )
+    assert email.to == student.email
+    assert "48 hours" in email.text
+    assert "held, not charged" in email.text
+    assert (booking.meeting_url or "") not in email.text
+
+
+def test_accepted_and_declined_senders(app: Flask) -> None:
+    """Accept mails both sides with the link; decline mails reason once."""
+    booking = rich_case_booking(app)
+    accepted = send_accepted_emails(booking.id)
+    assert [log.kind for log in accepted] == [
+        KIND_CONFIRMED_PROFESSOR, KIND_CONFIRMED_STUDENT,
+    ]
+    assert all(log.status == "sent" for log in accepted)
+    booking.decline_reason = "Conference week."
+    db.session.commit()
+    declined = send_declined_email(booking.id)
+    assert declined is not None and declined.kind == KIND_DECLINED_STUDENT
+    professor = db.session.get(User, booking.professor_id)
+    student = db.session.get(User, booking.student_id)
+    assert professor is not None and student is not None
+    confirmed = build_confirmed_professor_email(
+        booking=booking, student=student
+    )
+    assert confirmed.to == professor.email
+    assert (booking.meeting_url or "") in confirmed.text
+    refused = build_declined_email(
+        booking=booking, professor=professor, student=student
+    )
+    assert refused.to == student.email
+    assert "Conference week." in refused.text
+    assert "released" in refused.text
+    again = send_accepted_emails(booking.id)
+    assert [log.id for log in again] == [log.id for log in accepted]
 
 
 def test_email_failure_never_breaks_booking(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
@@ -320,10 +392,10 @@ def test_email_failure_never_breaks_booking(app: Flask, monkeypatch) -> None:  #
 
     from app.services.slots import generate_slots
 
-    def _boom(booking_id: int) -> None:
+    def _boom(booking_id: int, **kwargs: Any) -> None:
         raise RuntimeError("smtp is lava")
 
-    monkeypatch.setattr("app.blueprints.cases.send_booking_emails", _boom)
+    monkeypatch.setattr("app.blueprints.cases.send_request_emails", _boom)
     case, prof_id = seed_booking_case()
     profile = ProfessorProfile.query.filter_by(user_id=prof_id).one()
     slot = generate_slots(profile.availability or {})[0]

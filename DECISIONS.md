@@ -69,3 +69,6 @@
 - 2026-10-29: Booking emails send synchronously in the checkout request (demo scale); move to a worker if Resend latency ever matters.
 - 2026-10-29: /dashboard branches by role (students keep cases, professors get upcoming bookings); the case file lives at /dashboard/bookings/<id>, professor-only, consent-gated, 404 otherwise.
 - 2026-10-29: Email and case-file page share case_file_context() so both surfaces always show identical content.
+- 2026-10-30: Checkout bug: duplicate POSTs re-validated the slot against a grid the first request had already mutated (400 "Pick a valid slot" despite a created booking); retries on other slots duplicated bookings.
+- 2026-10-30: Checkout carries a per-render idempotency token (unique Booking.idempotency_key), resolved before slot validation; retries 303 to the same confirmation; checkout ends in 303, never 302.
+- 2026-10-30: Tests stub werkzeug scrypt with a behavior-preserving fast hash (login right/wrong/NULL/empty semantics intact); suite 277s to 36s, production hashing unchanged.

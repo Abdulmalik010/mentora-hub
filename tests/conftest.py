@@ -22,6 +22,23 @@ def _email_outbox(monkeypatch, tmp_path):  # type: ignore[no-untyped-def]
     monkeypatch.delenv("RESEND_API_KEY", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _fast_password_hash(monkeypatch):  # type: ignore[no-untyped-def]
+    """Stub scrypt in tests: suite-wide seeding would otherwise take minutes.
+
+    Login semantics are preserved (right password passes, wrong fails, NULL
+    and empty stay blocked, empty set_password still raises); only the KDF
+    cost is removed. Production hashing is unchanged.
+    """
+    monkeypatch.setattr(
+        "app.models.generate_password_hash", lambda p: f"testhash:{p}"
+    )
+    monkeypatch.setattr(
+        "app.models.check_password_hash",
+        lambda h, p: isinstance(h, str) and h == f"testhash:{p}",
+    )
+
+
 @pytest.fixture
 def app(tmp_path):  # type: ignore[no-untyped-def]
     """App with a throwaway file database (SQLite ``:memory:`` is per-connection)."""

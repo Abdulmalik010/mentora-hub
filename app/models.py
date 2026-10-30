@@ -145,6 +145,7 @@ class Booking(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     professor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     case_id = db.Column(db.Integer, db.ForeignKey("case_files.id"), nullable=True)
+    idempotency_key = db.Column(db.String(64), nullable=True, unique=True)
     status = db.Column(db.String(20), nullable=False, default="pending")
     scheduled_at = db.Column(db.DateTime, nullable=True)
     meeting_url = db.Column(db.String(500), nullable=True)

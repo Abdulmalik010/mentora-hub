@@ -38,6 +38,7 @@ def test_seeded_professor_login_and_dashboard(app: Flask) -> None:
     create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=future_start(), consent_share_diagnosis=True,
+        idempotency_key="tok-prof-dash-1",
     )
     client = app.test_client()
     login_professor(client, 12)
@@ -55,14 +56,17 @@ def test_professor_dashboard_lists_own_upcoming_only(app: Flask) -> None:
     mine = create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=future_start(3), consent_share_diagnosis=True,
+        idempotency_key="tok-prof-own-1",
     )
     create_booking(
         student_id=case.student_id, professor_id=2, case_id=case.id,
         start_naive_utc=future_start(4), consent_share_diagnosis=True,
+        idempotency_key="tok-prof-own-2",
     )
     create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=future_start(-3), consent_share_diagnosis=True,
+        idempotency_key="tok-prof-own-3",
     )
     client = app.test_client()
     login_professor(client, 12)
@@ -84,6 +88,7 @@ def test_case_file_page_matches_email(app: Flask) -> None:
     booking = create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=future_start(), consent_share_diagnosis=True,
+        idempotency_key="tok-prof-file-1",
     )
     professor = db.session.get(User, prof_id)
     student = db.session.get(User, case.student_id)
@@ -118,6 +123,7 @@ def test_case_file_access_control(app: Flask) -> None:
     booking = create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=future_start(), consent_share_diagnosis=True,
+        idempotency_key="tok-prof-access-1",
     )
     url = f"/dashboard/bookings/{booking.id}"
     client = app.test_client()

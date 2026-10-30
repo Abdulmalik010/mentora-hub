@@ -27,13 +27,13 @@ EMAIL = OutgoingEmail(
 )
 
 
-def seed_booking() -> Booking:
+def seed_booking(key: str = "tok-email-1") -> Booking:
     """Seeded booking with consent for professor 12."""
     case, prof_id = seed_booking_case()
     return create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=datetime(2026, 11, 4, 9, 0),
-        consent_share_diagnosis=True,
+        consent_share_diagnosis=True, idempotency_key=key,
     )
 
 
@@ -229,7 +229,7 @@ def rich_case_booking(app: Flask) -> Booking:  # type: ignore[no-untyped-def]
     return create_booking(
         student_id=case.student_id, professor_id=prof_id, case_id=case.id,
         start_naive_utc=datetime(2026, 11, 4, 9, 0),
-        consent_share_diagnosis=True,
+        consent_share_diagnosis=True, idempotency_key="tok-email-rich-1",
     )
 
 
@@ -299,9 +299,12 @@ def test_booking_post_sends_both_emails(app: Flask, tmp_path) -> None:  # type: 
     login_sample_student(client)
     response = client.post(
         f"/cases/{case.id}/book/{prof_id}",
-        data={"slot": slot.key, "consent": "yes"},
+        data={
+            "slot": slot.key, "consent": "yes",
+            "idempotency_token": "tok-email-flow-1",
+        },
     )
-    assert response.status_code == 302
+    assert response.status_code == 303
     booking = Booking.query.one()
     kinds = {
         row.kind: row.status
@@ -328,7 +331,10 @@ def test_email_failure_never_breaks_booking(app: Flask, monkeypatch) -> None:  #
     login_sample_student(client)
     response = client.post(
         f"/cases/{case.id}/book/{prof_id}",
-        data={"slot": slot.key, "consent": "yes"},
+        data={
+            "slot": slot.key, "consent": "yes",
+            "idempotency_token": "tok-email-boom-1",
+        },
         follow_redirects=True,
     )
     assert response.status_code == 200

@@ -1,6 +1,7 @@
 """Student workspace: dashboard, intake, case detail, booking, sessions."""
 from __future__ import annotations
 
+import secrets
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -18,7 +19,11 @@ from ..models import (
     User,
 )
 from ..security import current_user, login_required, role_required
-from ..services.booking import SlotTakenError, create_booking
+from ..services.booking import (
+    DuplicateCheckoutError,
+    SlotTakenError,
+    create_booking,
+)
 from ..services.diagnosis import run_case_pipeline
 from ..services.email_service import case_file_context, send_booking_emails
 from ..services.extraction import ExtractionError, save_upload, validate_upload
@@ -307,6 +312,7 @@ def _render_book_form(
             profile=profile,
             match=match,
             slot_groups=ordered,
+            idempotency_token=secrets.token_urlsafe(16),
         ),
         status,
     )
@@ -324,11 +330,31 @@ def book_form(case_id: int, professor_id: int) -> tuple[str, int]:
 @bp.post("/cases/<int:case_id>/book/<int:professor_id>")
 @role_required("student")
 def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
-    """Validate slot plus consent, then race-safe create the booking."""
+    """Validate slot plus consent, then race-safe create the booking.
+
+    The idempotency token is resolved before any slot validation so a
+    retry never re-validates a slot this same checkout just took.
+    """
     user = current_user()
     assert user is not None  # guaranteed by role_required
     case = _own_case_or_404(case_id)
     professor, profile, match = _matched_professor_or_404(case, professor_id)
+    token = request.form.get("idempotency_token", "").strip()
+    if not token:
+        flash("Checkout expired; please try again.", "error")
+        return _render_book_form(case, professor, profile, match, 400)
+    duplicate = Booking.query.filter_by(idempotency_key=token).first()
+    if duplicate is not None:
+        if (
+            duplicate.student_id != user.id
+            or duplicate.case_id != case.id
+            or duplicate.professor_id != professor.id
+        ):
+            flash("Checkout token does not match this session.", "error")
+            return _render_book_form(case, professor, profile, match, 400)
+        return redirect(
+            url_for("cases.confirmation", booking_id=duplicate.id), code=303
+        )
     slot = slot_from_key(request.form.get("slot", ""))
     valid_keys = {
         open_slot.key for open_slot in _open_slots(professor.id, profile)
@@ -346,6 +372,11 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
             case_id=case.id,
             start_naive_utc=slot.start_naive_utc,
             consent_share_diagnosis=True,
+            idempotency_key=token,
+        )
+    except DuplicateCheckoutError as exc:
+        return redirect(
+            url_for("cases.confirmation", booking_id=exc.booking.id), code=303
         )
     except SlotTakenError as exc:
         flash(str(exc), "error")
@@ -356,7 +387,9 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
     except Exception:  # noqa: BLE001 — email must never break the booking
         current_app.logger.exception("booking emails failed")
         flash("Booked, but the notification emails could not be sent.", "error")
-    return redirect(url_for("cases.session_detail", booking_id=booking.id))
+    return redirect(
+        url_for("cases.confirmation", booking_id=booking.id), code=303
+    )
 
 
 @bp.get("/sessions")
@@ -378,6 +411,20 @@ def sessions_list() -> str:
         for booking in bookings
     ]
     return render_template("sessions/list.html", rows=rows)
+
+
+@bp.get("/sessions/<int:booking_id>/confirmation")
+@role_required("student")
+def confirmation(booking_id: int) -> str:
+    """Post-checkout receipt; the 303 target, safe to refresh and share."""
+    booking = db.session.get(Booking, booking_id)
+    user = current_user()
+    if booking is None or user is None or booking.student_id != user.id:
+        abort(404)
+    professor = db.session.get(User, booking.professor_id)
+    return render_template(
+        "cases/confirmation.html", booking=booking, professor=professor
+    )
 
 
 @bp.get("/sessions/<int:booking_id>")

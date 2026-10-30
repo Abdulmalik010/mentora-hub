@@ -11,6 +11,7 @@
       {% call card("Pick a slot") %}
         <form method="post" action="{{ url_for('cases.book_submit', case_id=case.id, professor_id=professor.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="idempotency_token" value="{{ idempotency_token }}">
           <p class="mt-1 text-xs text-muted">Times in WAT · your local time in brackets · 60 minutes each.</p>
           {% for day, slots in slot_groups %}
             {% set is_first_day = loop.first %}

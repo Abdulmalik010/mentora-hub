@@ -81,3 +81,7 @@
 - 2026-10-30: Notifications: Notification rows, nav bell with unread count polled every 20s, /notifications inbox plus mark-all-read; exactly 5 events (request to professor; accepted/declined/proposal/expired to student), cancels and answers silent.
 - 2026-10-30: Transition emails: session request (case file plus review link, no meeting link) and receipt at checkout; confirmed to both with the link on accept; declined with reason; same override/banner/idempotency rules.
 - 2026-10-30: User-driven notifies live in the views; the expiry notice lives in expire_booking so lazy, CLI and guard paths all emit it.
+- 2026-10-30: Demo wallet is a LedgerEntry table (hold/capture/release/platform_fee, whole naira); students open with 100,000 demo credits, professors with 0; balances computed from the ledger, never stored.
+- 2026-10-30: Requests hold the request-time rate (free sessions skip the ledger); accept captures with the professor credited minus a floored 10% platform fee (user NULL); decline/cancel/expire release; builders are idempotent.
+- 2026-10-30: Booking creation check-then-insert runs under a process lock (single-process guard against overspend races; multi-process needs row locks).
+- 2026-10-30: Part A needs no fresh dev DB (new table only); Part D will (new column on professor_profiles).

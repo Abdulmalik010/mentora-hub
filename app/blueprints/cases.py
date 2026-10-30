@@ -22,6 +22,7 @@ from ..security import current_user, login_required, role_required
 from ..services.booking import (
     ACTIVE_STATUSES,
     DuplicateCheckoutError,
+    InsufficientFundsError,
     SlotTakenError,
     create_booking,
 )
@@ -39,6 +40,7 @@ from ..services.email_service import (
     send_request_emails,
 )
 from ..services.notifications import notify_transition
+from ..services.wallet import demo_balance
 from ..services.extraction import ExtractionError, save_upload, validate_upload
 from ..services.matching import get_case_matches
 from ..services.slots import Slot, generate_slots, slot_from_key
@@ -89,6 +91,7 @@ def dashboard() -> str:
         greeting=greeting,
         open_count=open_count,
         done_count=done_count,
+        demo_balance=demo_balance(user),
     )
 
 
@@ -529,6 +532,9 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
         return redirect(
             url_for("cases.confirmation", booking_id=exc.booking.id), code=303
         )
+    except InsufficientFundsError as exc:
+        flash(str(exc), "error")
+        return _render_book_form(case, professor, profile, match, 400)
     except SlotTakenError as exc:
         flash(str(exc), "error")
         return _render_book_form(case, professor, profile, match, 409)

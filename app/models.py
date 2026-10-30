@@ -295,6 +295,30 @@ class Notification(db.Model):
     user = db.relationship("User", foreign_keys=[user_id])
 
 
+class LedgerEntry(db.Model):
+    """One demo-money movement; balances are computed, never stored.
+
+    ``user_id`` is NULL only for platform_fee rows (the platform's cut).
+    Amounts are whole naira, always positive; the type gives the direction.
+    """
+
+    __tablename__ = "ledger_entries"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True, index=True
+    )
+    booking_id = db.Column(
+        db.Integer, db.ForeignKey("bookings.id"), nullable=False, index=True
+    )
+    type = db.Column(db.String(20), nullable=False)
+    amount = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+
+    user = db.relationship("User", foreign_keys=[user_id])
+    booking = db.relationship("Booking", foreign_keys=[booking_id])
+
+
 class ToolCallLog(db.Model):
     """Audit row for every agent tool call (see ``run_tool_loop``)."""
 

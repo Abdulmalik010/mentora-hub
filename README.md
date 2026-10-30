@@ -76,7 +76,8 @@ app/
   extensions.py      shared extensions (db)
   models.py          User, ProfessorProfile, StudentProfile, Document,
                      CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
-                     MatchResult, EmailLog, Notification, ToolCallLog
+                     MatchResult, EmailLog, Notification, LedgerEntry,
+                     ToolCallLog
   security.py        current_user, login_required, role_required
   blueprints/        auth (register/login/logout), cases (role dashboards,
                      intake, detail, events, booking, sessions, case file),
@@ -91,6 +92,7 @@ app/
     slots.py         60-minute slot grid (UTC store, WAT display)
     booking.py       race-safe booking creation, Jitsi links, demo refs
     booking_workflow.py request state machine, transitions, expiry
+    wallet.py        demo ledger, holds, captures, balances
     email_service.py Resend HTTPS or local outbox, case-file + confirmation
     notifications.py inbox rows, unread counts, transition fan-out
     transcription.py stub (Muse Voice Transcribe)
@@ -105,7 +107,8 @@ samples/             synthetic thesis excerpts + expected.json (demo fixtures)
 eval/                30 generated matching-eval cases
 docs/eval/           eval reports (written by the eval scripts)
 tests/               pytest suite (smoke, auth, intake, parallel, matching,
-                     booking, email, workflow, notifications, professor)
+                     booking, email, workflow, notifications, professor,
+                     wallet)
 ```
 
 ## Live API check
@@ -138,7 +141,9 @@ Sessions. The meeting link appears only once accepted. Stale requests expire
 automatically on read, or sweep them with `flask expire-requests`. Both sides
 get inbox notifications (nav bell, `/notifications`) and emails per state
 change: request + receipt at checkout, confirmed to both on accept, reasoned
-decline to the student. Emails
+decline to the student. Money is demo ledger credits: students start with
+₦100,000, requests hold the rate, acceptance pays the professor minus a 10%
+platform fee, and declines release the hold. Emails
 default to the local `outbox/` provider (gitignored `.eml` files, never
 delivered). For real delivery set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`,
 and `DEMO_RECIPIENT_OVERRIDE` to your own inbox: the Resend sandbox only

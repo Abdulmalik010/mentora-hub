@@ -28,6 +28,7 @@ from .booking import (
     SlotTakenError,
 )
 from .notifications import notify_transition
+from .wallet import capture_entries, release_entries
 
 Actor = Literal["professor", "student", "system"]
 
@@ -199,18 +200,26 @@ def apply_transition(
         )
     elif action == "expire":
         values.update(decided_at=current, payment_status="released")
+    if action in ("accept", "accept_proposal"):
+        ledger = capture_entries(booking)
+    elif action in ("decline", "cancel", "decline_proposal", "expire"):
+        ledger = release_entries(booking)
+    else:  # propose: the original hold stays put
+        ledger = []
+    db.session.add_all(ledger)
     try:
         rowcount = (
             db.session.query(Booking)
             .filter_by(id=booking.id, status=edge.frm)
             .update(values, synchronize_session=False)
         )
+        if rowcount == 0:
+            db.session.rollback()
+            raise InvalidTransitionError("booking changed; please retry")
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
         raise SlotTakenError("slot was just taken") from None
-    if rowcount == 0:
-        raise InvalidTransitionError("booking changed; please retry")
     refreshed = db.session.get(Booking, booking.id)
     assert refreshed is not None  # just updated it
     return refreshed
@@ -219,6 +228,10 @@ def apply_transition(
 def expire_booking(booking_id: int, now: datetime | None = None) -> bool:
     """Expire one request if still pending; True when it flipped."""
     current = now or utcnow_naive()
+    booking = db.session.get(Booking, booking_id)
+    if booking is None:
+        return False
+    db.session.add_all(release_entries(booking))
     rowcount = (
         db.session.query(Booking)
         .filter(
@@ -236,10 +249,12 @@ def expire_booking(booking_id: int, now: datetime | None = None) -> bool:
             synchronize_session=False,
         )
     )
+    if not rowcount:
+        db.session.rollback()
+        return False
     db.session.commit()
-    if rowcount:
-        notify_transition(booking_id, "expired")
-    return rowcount > 0
+    notify_transition(booking_id, "expired")
+    return True
 
 
 def expire_stale_bookings(now: datetime | None = None) -> list[int]:

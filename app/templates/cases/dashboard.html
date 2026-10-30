@@ -4,9 +4,10 @@
 {% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
 {{ section_header(greeting + ", " + current_user.display_name.split()[0] + ".", "Your intake requests and their diagnoses.") }}
-<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat_card("Open cases", open_count, "clock") }}
   {{ stat_card("Completed diagnoses", done_count, "check") }}
+  {{ stat_card("Demo balance", demo_balance|ngn + " demo", "inbox") }}
   <a href="{{ url_for('cases.new_form') }}" class="flex items-center justify-between rounded-2xl bg-brand px-5 py-4 text-white shadow-sm hover:bg-brand-hover">
     <span>
       <span class="block text-sm font-medium text-white/85">Start a diagnosis</span>

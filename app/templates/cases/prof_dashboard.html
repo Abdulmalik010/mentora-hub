@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_ui.html" import card, badge, section_header, empty_state, status_chip, stat_card %}
+{% from "inbox/_list.html" import thread_list %}
 {% block title %}Dashboard · Mentora Academic Hub{% endblock %}
 {% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
@@ -121,6 +122,7 @@
                 {% if booking.status == "accepted" and booking.meeting_url %}
                   <a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-brand hover:text-brand-hover">Join video ↗</a>
                 {% endif %}
+                <a href="{{ url_for('inbox.thread', booking_id=booking.id) }}" class="text-sm font-semibold text-brand hover:text-brand-hover">Message student →</a>
               </div>
             </div>
           {% endcall %}
@@ -133,7 +135,12 @@
 </section>
 
 <section id="panel-inbox" role="tabpanel" aria-labelledby="tab-inbox" data-tab-panel="inbox" class="{{ '' if active_tab == 'inbox' else 'hidden' }} pt-6">
-  {{ empty_state("No messages yet", "When a student messages you about a booking, the thread will appear here.", icon_name="bell") }}
+  {% if threads %}
+    {{ thread_list(threads) }}
+    <p class="mt-4 text-sm"><a href="{{ url_for('inbox.thread_list') }}" class="font-semibold text-brand hover:text-brand-hover">Open full inbox →</a></p>
+  {% else %}
+    {{ empty_state("No messages yet", "When a student messages you about a booking, the thread will appear here.", icon_name="bell") }}
+  {% endif %}
 </section>
 
 <section id="panel-profile" role="tabpanel" aria-labelledby="tab-profile" data-tab-panel="profile" class="{{ '' if active_tab == 'profile' else 'hidden' }} pt-6">

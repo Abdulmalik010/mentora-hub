@@ -50,6 +50,7 @@ def test_models_import_and_tables_exist(app: Flask) -> None:
         "email_logs",
         "notifications",
         "ledger_entries",
+        "messages",
         "tool_call_logs",
     }
     assert User.query.count() == 0

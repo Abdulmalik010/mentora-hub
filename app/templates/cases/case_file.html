@@ -14,6 +14,7 @@
   {% if booking.status == "accepted" and booking.meeting_url %}
     <p class="mt-1 text-sm"><a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a></p>
   {% endif %}
+  <p class="mt-1 text-sm"><a href="{{ url_for('inbox.thread', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Message student →</a></p>
   {% if booking.status == "reschedule_proposed" and booking.proposed_start %}
     <p class="mt-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm">You proposed {{ booking.proposed_start|wat }} — waiting on the student.</p>
   {% endif %}

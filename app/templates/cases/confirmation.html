@@ -20,6 +20,7 @@
     </dl>
     <div class="mt-6 flex flex-wrap gap-3">
       {{ button("View session", href=url_for("cases.session_detail", booking_id=booking.id)) }}
+      {{ button("Message professor", href=url_for("inbox.thread", booking_id=booking.id), variant="secondary") }}
       {{ button("All sessions", href=url_for("cases.sessions_list"), variant="secondary") }}
     </div>
   {% endcall %}

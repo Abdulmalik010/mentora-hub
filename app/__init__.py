@@ -25,6 +25,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     from .blueprints.auth import bp as auth_bp
     from .blueprints.bookings import bp as bookings_bp
     from .blueprints.cases import bp as cases_bp
+    from .blueprints.inbox import bp as inbox_bp
     from .blueprints.notifications import bp as notifications_bp
     from .blueprints.professors import bp as professors_bp
 
@@ -34,6 +35,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(bookings_bp, url_prefix="/bookings")
     app.register_blueprint(agent_bp, url_prefix="/agent")
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(inbox_bp)
 
     @app.get("/health")
     def health() -> dict[str, str]:

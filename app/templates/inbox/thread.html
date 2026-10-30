@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card, badge, status_chip %}
+{% block title %}Thread · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}
+{% block content %}
+<p class="mb-4 text-sm font-semibold text-brand"><a href="{{ url_for('inbox.thread_list') }}" class="hover:text-brand-hover">← Inbox</a></p>
+<div class="mb-4 flex flex-wrap items-center gap-2">
+  <h1 class="font-display text-2xl font-semibold tracking-tight">{{ other.display_name if other else "Thread" }}</h1>
+  {{ status_chip(booking.status) }}
+</div>
+{% call card() %}
+  <ol id="message-list" class="space-y-4" aria-live="polite">
+    {% for message in messages %}
+      <li data-message-id="{{ message.id }}">
+        <p class="text-xs text-muted">
+          <strong class="font-semibold {{ 'text-brand' if message.sender_id == current_user.id else 'text-ink' }}">
+            {{ "You" if message.sender_id == current_user.id else (other.display_name if other else "Them") }}
+          </strong>
+          · {{ message.created_at.strftime("%Y-%m-%d %H:%M") }} UTC
+        </p>
+        <p class="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{{ message.body }}</p>
+      </li>
+    {% else %}
+      <li id="thread-empty" class="text-sm text-muted">No messages yet — say hello.</li>
+    {% endfor %}
+  </ol>
+  {% if locked %}
+    <p class="mt-4 rounded-xl border border-border bg-paper px-4 py-3 text-sm text-muted">This thread is read-only: the booking is {{ booking.status.replace("_", " ") }}.</p>
+  {% else %}
+    <form id="message-form" method="post" action="{{ url_for('inbox.send', booking_id=booking.id) }}" class="mt-4 border-t border-border pt-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label class="sr-only" for="message-body">Message</label>
+      <textarea id="message-body" name="body" rows="3" maxlength="2000" required placeholder="Write a message…"
+          class="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm"></textarea>
+      <div class="mt-2 flex items-center justify-between gap-3">
+        <p class="text-xs text-muted"><span id="message-count">0</span>/2000 · max 20 per minute</p>
+        <button type="submit" class="rounded-lg bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-hover">Send</button>
+      </div>
+    </form>
+  {% endif %}
+{% endcall %}
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var list = document.getElementById('message-list');
+    var box = document.getElementById('message-body');
+    var count = document.getElementById('message-count');
+    if (box && count) {
+      box.addEventListener('input', function () { count.textContent = box.value.length; });
+    }
+    function lastId() {
+      var items = list ? list.querySelectorAll('[data-message-id]') : [];
+      if (!items.length) { return 0; }
+      return parseInt(items[items.length - 1].getAttribute('data-message-id'), 10) || 0;
+    }
+    function appendRow(item) {
+      var empty = document.getElementById('thread-empty');
+      if (empty) { empty.remove(); }
+      var li = document.createElement('li');
+      li.setAttribute('data-message-id', item.id);
+      var meta = document.createElement('p');
+      meta.className = 'text-xs text-muted';
+      var who = document.createElement('strong');
+      who.className = 'font-semibold ' + (item.mine ? 'text-brand' : 'text-ink');
+      who.textContent = item.mine ? 'You' : item.sender_name;
+      meta.appendChild(who);
+      meta.appendChild(document.createTextNode(' · ' + item.created_at.replace('T', ' ').slice(0, 16) + ' UTC'));
+      var body = document.createElement('p');
+      body.className = 'mt-1 whitespace-pre-wrap text-sm leading-relaxed';
+      body.textContent = item.body;
+      li.appendChild(meta);
+      li.appendChild(body);
+      list.appendChild(li);
+    }
+    window.setInterval(function () {
+      if (!list) { return; }
+      fetch('{{ url_for("inbox.poll", booking_id=booking.id) }}?after=' + lastId(),
+          {headers: {'Accept': 'application/json'}})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (data) {
+          if (!data || !data.messages) { return; }
+          data.messages.forEach(appendRow);
+        })
+        .catch(function () {});
+    }, 5000);
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% from "_ui.html" import section_header, empty_state %}
+{% from "inbox/_list.html" import thread_list %}
+{% block title %}Inbox · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}
+{% block content %}
+{{ section_header("Inbox", "One thread per booking, most recently active first.") }}
+{% if threads %}
+  {{ thread_list(threads) }}
+{% else %}
+  {{ empty_state("No threads yet", "Threads appear here once a session is requested.", icon_name="inbox") }}
+{% endif %}
+{% endblock %}

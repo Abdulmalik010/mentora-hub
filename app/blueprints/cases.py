@@ -39,6 +39,7 @@ from ..services.email_service import (
     send_declined_email,
     send_request_emails,
 )
+from ..services.messaging import get_threads, unread_message_count
 from ..services.notifications import notify_transition
 from ..services.wallet import demo_balance
 from ..services.extraction import ExtractionError, save_upload, validate_upload
@@ -150,9 +151,10 @@ def _professor_dashboard(user: User) -> str:
             if row["booking"].status == "requested"
         ),
         upcoming_count=len(upcoming),
-        unread_messages=0,  # wired when per-booking messaging lands
+        unread_messages=unread_message_count(user.id),
         requests=requests,
         upcoming=upcoming,
+        threads=get_threads(user.id),
         profile=profile,
         proposal_slots=proposal_slots,
         active_tab=tab,

@@ -1,7 +1,7 @@
 """Inbox notifications: create rows, count unread, mark read."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from ..extensions import db
 from ..models import Booking, Notification, User
@@ -12,6 +12,9 @@ KIND_ACCEPTED = "accepted"
 KIND_DECLINED = "declined"
 KIND_PROPOSAL = "proposal"
 KIND_EXPIRED = "expired"
+KIND_NEW_MESSAGE = "new_message"
+
+MESSAGE_NOTIFY_BATCH = timedelta(minutes=10)
 
 
 def notify(
@@ -97,3 +100,27 @@ def notify_transition(booking_id: int, event: str) -> Notification | None:
             f"{slot} · the demo hold was released", session_url,
         )
     raise ValueError(f"unknown booking event: {event}")
+
+
+def notify_new_message(
+    recipient_id: int, booking_id: int, sender_name: str
+) -> Notification | None:
+    """Message ping, batched to one per thread per 10 minutes.
+
+    Returns None when a recent ping for the thread already exists.
+    """
+    url = f"/inbox/{booking_id}"
+    since = datetime.now(timezone.utc).replace(tzinfo=None)
+    recent = (
+        Notification.query.filter_by(
+            user_id=recipient_id, kind=KIND_NEW_MESSAGE, url=url
+        )
+        .filter(Notification.created_at > since - MESSAGE_NOTIFY_BATCH)
+        .first()
+    )
+    if recent is not None:
+        return None
+    return notify(
+        recipient_id, KIND_NEW_MESSAGE,
+        f"New message from {sender_name}", "Open the thread to read it.", url,
+    )

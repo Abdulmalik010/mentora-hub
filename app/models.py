@@ -319,6 +319,26 @@ class LedgerEntry(db.Model):
     booking = db.relationship("Booking", foreign_keys=[booking_id])
 
 
+class Message(db.Model):
+    """One thread message; read when the other party opens the thread."""
+
+    __tablename__ = "messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(
+        db.Integer, db.ForeignKey("bookings.id"), nullable=False, index=True
+    )
+    sender_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False
+    )
+    body = db.Column(db.String(2000), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    read_at = db.Column(db.DateTime, nullable=True)
+
+    booking = db.relationship("Booking", foreign_keys=[booking_id])
+    sender = db.relationship("User", foreign_keys=[sender_id])
+
+
 class ToolCallLog(db.Model):
     """Audit row for every agent tool call (see ``run_tool_loop``)."""
 

@@ -87,3 +87,7 @@
 - 2026-10-30: Part A needs no fresh dev DB (new table only); Part D will (new column on professor_profiles).
 - 2026-10-30: Professor workspace is one page: 4 stat cards plus JS tabs (requests/upcoming/inbox/profile, ?tab= deep link); request cards carry a case preview (core problem, top 2 gaps) and the same action endpoints.
 - 2026-10-30: Workspace Inbox tab and Unread stat are placeholders until per-booking messaging lands (empty state, 0); Profile tab is read-only until the editor lands.
+- 2026-10-30: One message thread per booking from request time; posting only while requested/accepted/proposed (403 + locked notice after); bodies cap at 2000 chars, escaped in templates and via textContent in the 5s poll script.
+- 2026-10-30: Messaging rate limit is 20/minute/user, DB-backed (holds across processes); 429 with the thread re-rendered.
+- 2026-10-30: Message pings batch to one notification per thread per 10 minutes and one email per thread per hour (hour-bucketed kind keeps idempotency without blocking later pings).
+- 2026-10-30: Part C needs no fresh dev DB (new table only).

@@ -18,8 +18,10 @@
           <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
           <a href="{{ url_for('cases.new_form') }}" class="font-medium text-muted hover:text-ink">New request</a>
           <a href="{{ url_for('cases.sessions_list') }}" class="font-medium text-muted hover:text-ink">Sessions</a>
+          <a href="{{ url_for('inbox.thread_list') }}" class="font-medium text-muted hover:text-ink">Inbox</a>
         {% elif current_user.role == "professor" %}
           <a href="{{ url_for('cases.dashboard') }}" class="font-medium text-muted hover:text-ink">Dashboard</a>
+          <a href="{{ url_for('inbox.thread_list') }}" class="font-medium text-muted hover:text-ink">Inbox</a>
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="font-medium text-muted hover:text-ink">Professors</a>
         <a href="{{ url_for('notifications.inbox') }}" class="relative rounded-lg p-1.5 text-muted hover:text-ink" aria-label="Notifications">
@@ -57,8 +59,10 @@
           <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
           <a href="{{ url_for('cases.new_form') }}" class="py-1">New request</a>
           <a href="{{ url_for('cases.sessions_list') }}" class="py-1">Sessions</a>
+          <a href="{{ url_for('inbox.thread_list') }}" class="py-1">Inbox</a>
         {% elif current_user.role == "professor" %}
           <a href="{{ url_for('cases.dashboard') }}" class="py-1">Dashboard</a>
+          <a href="{{ url_for('inbox.thread_list') }}" class="py-1">Inbox</a>
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="py-1">Professors</a>
         <a href="{{ url_for('notifications.inbox') }}" class="py-1">Notifications{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a>

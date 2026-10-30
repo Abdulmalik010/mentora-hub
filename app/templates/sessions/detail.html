@@ -50,6 +50,9 @@
     <div><dt class="text-muted">Payment (demo)</dt>
       <dd class="text-muted">{{ booking.mock_payment_ref or "—" }} · {{ booking.payment_status or "—" }}</dd>
     </div>
+    <div><dt class="text-muted">Messages</dt>
+      <dd><a href="{{ url_for('inbox.thread', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Message professor →</a></dd>
+    </div>
   </dl>
   {% if booking.status == "requested" %}
     <form method="post" action="{{ url_for('cases.student_cancel', booking_id=booking.id) }}" class="mt-5 border-t border-border pt-4">

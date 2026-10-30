@@ -13,7 +13,7 @@ import html
 import os
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from typing import Any
 
@@ -32,6 +32,9 @@ KIND_REQUEST_STUDENT = "request_received_student"
 KIND_CONFIRMED_PROFESSOR = "booking_confirmed_professor"
 KIND_CONFIRMED_STUDENT = "booking_confirmed_student"
 KIND_DECLINED_STUDENT = "booking_declined_student"
+KIND_MESSAGE_BASE = "new_message"
+
+MESSAGE_EMAIL_BATCH = timedelta(hours=1)
 
 DEFAULT_FROM = "onboarding@resend.dev"
 STATUS_SENT = "sent"
@@ -638,5 +641,77 @@ def send_declined_email(booking_id: int) -> EmailLog | None:
         kind=KIND_DECLINED_STUDENT,
         email=build_declined_email(
             booking=booking, professor=professor, student=student
+        ),
+    )
+
+
+def build_new_message_email(
+    *, recipient: User, sender: User, snippet: str, thread_url: str
+) -> OutgoingEmail:
+    """Thread ping with the message opening; links back to the thread."""
+    text = "\n".join(
+        [
+            f"New message from {sender.display_name}:",
+            "",
+            snippet,
+            "",
+            f"Read and reply: {thread_url}",
+            "",
+            "Sent from the Mentora Academic Hub demo.",
+        ]
+    )
+    html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
+<div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+<strong>New message</strong>
+</div>
+<div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
+<p>New message from <strong>{html.escape(sender.display_name)}</strong>:</p>
+<blockquote style="border-left:4px solid #C9A227;padding:8px 12px;color:#5B6475">{html.escape(snippet)}</blockquote>
+<p><a href="{html.escape(thread_url)}">Read and reply</a></p>
+<p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
+</div></div>"""
+    return OutgoingEmail(
+        to=recipient.email,
+        subject=f"New message from {sender.display_name}",
+        text=text,
+        html_body=html_body,
+    )
+
+
+def send_message_email(
+    booking_id: int, sender_id: int, *, thread_url: str, snippet: str
+) -> EmailLog | None:
+    """Thread ping email, at most one per thread per hour.
+
+    The kind carries the UTC hour bucket so the per-(booking, kind)
+    idempotency still dedupes retries without blocking next hour's ping.
+    Returns None when a ping went out within the past hour.
+    """
+    parties = _booking_parties(booking_id)
+    if parties is None:
+        return None
+    booking, _case, professor, student = parties
+    recipient = student if sender_id == professor.id else professor
+    if sender_id not in (student.id, professor.id):
+        return None
+    now = datetime.now(timezone.utc)
+    recent = (
+        EmailLog.query.filter(
+            EmailLog.booking_id == booking.id,
+            EmailLog.kind.startswith(KIND_MESSAGE_BASE),
+            EmailLog.status == STATUS_SENT,
+            EmailLog.created_at
+            > (now - MESSAGE_EMAIL_BATCH).replace(tzinfo=None),
+        ).first()
+    )
+    if recent is not None:
+        return None
+    sender = student if sender_id == student.id else professor
+    return send_logged_email(
+        booking_id=booking.id,
+        kind=f"{KIND_MESSAGE_BASE}:{now.strftime('%Y%m%dT%H')}",
+        email=build_new_message_email(
+            recipient=recipient, sender=sender, snippet=snippet[:200],
+            thread_url=thread_url,
         ),
     )

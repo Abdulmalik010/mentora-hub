@@ -82,7 +82,7 @@ app/
   blueprints/        auth (register/login/logout), cases (role dashboards,
                      intake, detail, events, booking, sessions, case file),
                      professors (public directory), bookings, agent (health),
-                     notifications (inbox, unread count)
+                     notifications (inbox, unread count), inbox (threads)
   templates/         base shell + design macros (_ui.html) + auth/case pages
   services/
     meta_client.py   Meta API: retries, structured output, run_tool_loop
@@ -95,6 +95,7 @@ app/
     wallet.py        demo ledger, holds, captures, balances
     email_service.py Resend HTTPS or local outbox, case-file + confirmation
     notifications.py inbox rows, unread counts, transition fan-out
+    messaging.py     per-booking threads, rate limits, read state
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
 scripts/seed.py      idempotent synthetic seed (20 profs / 4 depts / 3 students)
@@ -108,7 +109,7 @@ eval/                30 generated matching-eval cases
 docs/eval/           eval reports (written by the eval scripts)
 tests/               pytest suite (smoke, auth, intake, parallel, matching,
                      booking, email, workflow, notifications, professor,
-                     wallet)
+                     wallet, messaging)
 ```
 
 ## Live API check

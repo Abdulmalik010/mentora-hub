@@ -132,12 +132,25 @@ class CaseFile(db.Model):
 
 
 class Booking(db.Model):
-    """A booked 60-minute slot; ``scheduled_at`` is the naive-UTC start."""
+    """A requested 60-minute slot; ``scheduled_at`` is the naive-UTC start.
+
+    Status follows the request workflow (see ``booking_workflow``). Only
+    active statuses occupy the slot, enforced by a partial unique index.
+    """
 
     __tablename__ = "bookings"
     __table_args__ = (
-        db.UniqueConstraint(
-            "professor_id", "scheduled_at", name="uq_booking_professor_start"
+        db.Index(
+            "uq_booking_active_slot",
+            "professor_id",
+            "scheduled_at",
+            unique=True,
+            sqlite_where=db.text(
+                "status IN ('requested','accepted','reschedule_proposed')"
+            ),
+            postgresql_where=db.text(
+                "status IN ('requested','accepted','reschedule_proposed')"
+            ),
         ),
     )
 
@@ -146,8 +159,13 @@ class Booking(db.Model):
     professor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     case_id = db.Column(db.Integer, db.ForeignKey("case_files.id"), nullable=True)
     idempotency_key = db.Column(db.String(64), nullable=True, unique=True)
-    status = db.Column(db.String(20), nullable=False, default="pending")
+    status = db.Column(db.String(20), nullable=False, default="requested")
     scheduled_at = db.Column(db.DateTime, nullable=True)
+    decided_at = db.Column(db.DateTime, nullable=True)
+    decline_reason = db.Column(db.String(500), nullable=True)
+    proposed_start = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    payment_status = db.Column(db.String(20), nullable=False, default="held")
     meeting_url = db.Column(db.String(500), nullable=True)
     consent_share_diagnosis = db.Column(db.Boolean, nullable=False, default=False)
     mock_payment_ref = db.Column(db.String(120), nullable=True)

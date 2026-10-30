@@ -89,6 +89,7 @@ app/
     matching.py      professor tools, ranking, validation, match runner
     slots.py         60-minute slot grid (UTC store, WAT display)
     booking.py       race-safe booking creation, Jitsi links, demo refs
+    booking_workflow.py request state machine, transitions, expiry
     email_service.py Resend HTTPS or local outbox, case-file + confirmation
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
@@ -127,17 +128,22 @@ grounded evidence quotes plus three recommended professors on the left.
 
 From a finished case, open "Book session" on any match card: pick a WAT slot,
 tick the diagnosis-sharing consent, and confirm through the clearly labeled
-demo checkout (nothing is charged or stored). The session lands under Sessions
-with a Jitsi link. Emails default to the local `outbox/` provider (gitignored
-`.eml` files, never delivered). For real delivery set `EMAIL_PROVIDER=resend`,
-`RESEND_API_KEY`, and `DEMO_RECIPIENT_OVERRIDE` to your own inbox: the Resend
-sandbox only delivers to the account owner, `@example.com` sample addresses
-are refused outright, and every redirected email carries a
-"Demo: intended for" banner. Each booking sends each email kind at most once
-(`EmailLog`); mail failures never break the booking. Professors log in with
-their seeded `sample-professor-NN@example.com` address and
-`SEED_DEMO_PASSWORD`: `/dashboard` shows upcoming bookings, each with the
-read-only case file the email carried (consent-gated).
+demo checkout (nothing is charged or stored). Checkout is idempotent (retry
+safe) and ends on a confirmation page. The session is then *requested*, not
+booked: the professor has 48 hours to accept, decline (reason required) or
+propose another time from the case-file page, and the student answers from
+Sessions. The meeting link appears only once accepted. Stale requests expire
+automatically on read, or sweep them with `flask expire-requests`. Emails
+default to the local `outbox/` provider (gitignored `.eml` files, never
+delivered). For real delivery set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`,
+and `DEMO_RECIPIENT_OVERRIDE` to your own inbox: the Resend sandbox only
+delivers to the account owner, `@example.com` sample addresses are refused
+outright, and every redirected email carries a "Demo: intended for" banner.
+Each booking sends each email kind at most once (`EmailLog`); mail failures
+never break the booking. Professors log in with their seeded
+`sample-professor-NN@example.com` address and `SEED_DEMO_PASSWORD`:
+`/dashboard` shows upcoming bookings, each with the case file the email
+carried (consent-gated).
 
 ## Evaluation
 

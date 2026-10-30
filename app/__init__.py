@@ -95,4 +95,12 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
         """Styled 500 page."""
         return render_template("errors/500.html"), 500
 
+    @app.cli.command("expire-requests")
+    def expire_requests() -> None:
+        """Expire booking requests older than 48h (frees slots, releases)."""
+        from .services.booking_workflow import expire_stale_bookings
+
+        flipped = expire_stale_bookings()
+        print(f"Expired {len(flipped)} booking request(s).")
+
     return app

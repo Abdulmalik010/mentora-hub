@@ -20,9 +20,16 @@ from ..models import (
 )
 from ..security import current_user, login_required, role_required
 from ..services.booking import (
+    ACTIVE_STATUSES,
     DuplicateCheckoutError,
     SlotTakenError,
     create_booking,
+)
+from ..services.booking_workflow import (
+    BookingAuthError,
+    InvalidTransitionError,
+    apply_transition,
+    expire_stale_bookings,
 )
 from ..services.diagnosis import run_case_pipeline
 from ..services.email_service import case_file_context, send_booking_emails
@@ -87,11 +94,13 @@ def new_form() -> str:
 
 
 def _professor_dashboard(user: User) -> str:
-    """Upcoming bookings for one professor, soonest first."""
+    """Upcoming active bookings for one professor, soonest first."""
+    _expire_stale()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     bookings = (
         Booking.query.filter(
             Booking.professor_id == user.id,
+            Booking.status.in_(ACTIVE_STATUSES),
             Booking.scheduled_at.is_not(None),
             Booking.scheduled_at >= now,
         )
@@ -116,6 +125,7 @@ def professor_case_file(booking_id: int) -> str:
     Restricted to the booked professor, and only when the student
     consented to share the diagnosis; anything else is a 404.
     """
+    _expire_stale()
     booking = db.session.get(Booking, booking_id)
     user = current_user()
     if (
@@ -129,12 +139,102 @@ def professor_case_file(booking_id: int) -> str:
     if case is None:
         abort(404)
     student = db.session.get(User, booking.student_id)
+    profile = ProfessorProfile.query.filter_by(user_id=user.id).first()
+    proposal_slots = (
+        _open_slots(user.id, profile) if profile is not None else []
+    )
     return render_template(
         "cases/case_file.html",
         booking=booking,
         case=case,
         student=student,
         file=case_file_context(case),
+        proposal_slots=proposal_slots,
+    )
+
+
+@bp.post("/dashboard/bookings/<int:booking_id>/accept")
+@role_required("professor")
+def professor_accept(booking_id: int) -> Response:
+    """Accept the request: capture the demo hold, reveal the link."""
+    _expire_stale()
+    booking = _own_professor_booking_or_404(booking_id)
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    try:
+        apply_transition(booking.id, "accept", actor_user=user)
+    except BookingAuthError:
+        abort(403)
+    except (InvalidTransitionError, SlotTakenError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash(
+            "Session accepted. The meeting link is now visible to both.",
+            "success",
+        )
+    return redirect(
+        url_for("cases.professor_case_file", booking_id=booking.id), code=303
+    )
+
+
+@bp.post("/dashboard/bookings/<int:booking_id>/decline")
+@role_required("professor")
+def professor_decline(booking_id: int) -> Response:
+    """Decline with a reason: release the hold, free the slot."""
+    _expire_stale()
+    booking = _own_professor_booking_or_404(booking_id)
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    try:
+        apply_transition(
+            booking.id, "decline", actor_user=user,
+            reason=request.form.get("reason", ""),
+        )
+    except BookingAuthError:
+        abort(403)
+    except (InvalidTransitionError, SlotTakenError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash("Request declined.", "success")
+    return redirect(
+        url_for("cases.professor_case_file", booking_id=booking.id), code=303
+    )
+
+
+@bp.post("/dashboard/bookings/<int:booking_id>/propose")
+@role_required("professor")
+def professor_propose(booking_id: int) -> Response:
+    """Offer one alternative open slot for the student to answer."""
+    _expire_stale()
+    booking = _own_professor_booking_or_404(booking_id)
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    profile = ProfessorProfile.query.filter_by(user_id=user.id).first()
+    choices = (
+        {slot.key: slot for slot in _open_slots(user.id, profile)}
+        if profile is not None
+        else {}
+    )
+    slot = slot_from_key(request.form.get("new_slot", ""))
+    if slot is None or slot.key not in choices:
+        flash("Pick a valid open slot.", "error")
+        return redirect(
+            url_for("cases.professor_case_file", booking_id=booking.id),
+            code=303,
+        )
+    try:
+        apply_transition(
+            booking.id, "propose", actor_user=user,
+            new_start=slot.start_naive_utc,
+        )
+    except BookingAuthError:
+        abort(403)
+    except (InvalidTransitionError, SlotTakenError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash("Alternative proposed.", "success")
+    return redirect(
+        url_for("cases.professor_case_file", booking_id=booking.id), code=303
     )
 
 
@@ -272,11 +372,14 @@ def _matched_professor_or_404(
 
 
 def _open_slots(professor_id: int, profile: ProfessorProfile) -> list[Slot]:
-    """Generated slots minus already-booked starts."""
+    """Generated slots minus starts held by active bookings."""
     booked = {
         row[0]
         for row in db.session.query(Booking.scheduled_at)
-        .filter_by(professor_id=professor_id)
+        .filter(
+            Booking.professor_id == professor_id,
+            Booking.status.in_(ACTIVE_STATUSES),
+        )
         .all()
     }
     return [
@@ -284,6 +387,29 @@ def _open_slots(professor_id: int, profile: ProfessorProfile) -> list[Slot]:
         for slot in generate_slots(profile.availability or {})
         if slot.start_naive_utc not in booked
     ]
+
+
+def _expire_stale() -> None:
+    """Flip expired requests before any booking read (lazy expiry)."""
+    expire_stale_bookings()
+
+
+def _own_student_booking_or_404(booking_id: int) -> Booking:
+    """Booking owned by the current student; 404 for anything else."""
+    booking = db.session.get(Booking, booking_id)
+    user = current_user()
+    if booking is None or user is None or booking.student_id != user.id:
+        abort(404)
+    return booking
+
+
+def _own_professor_booking_or_404(booking_id: int) -> Booking:
+    """Booking owned by the current professor; 404 for anything else."""
+    booking = db.session.get(Booking, booking_id)
+    user = current_user()
+    if booking is None or user is None or booking.professor_id != user.id:
+        abort(404)
+    return booking
 
 
 def _render_book_form(
@@ -322,6 +448,7 @@ def _render_book_form(
 @role_required("student")
 def book_form(case_id: int, professor_id: int) -> tuple[str, int]:
     """Slot picker, session summary, consent and demo payment."""
+    _expire_stale()
     case = _own_case_or_404(case_id)
     professor, profile, match = _matched_professor_or_404(case, professor_id)
     return _render_book_form(case, professor, profile, match)
@@ -335,6 +462,7 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
     The idempotency token is resolved before any slot validation so a
     retry never re-validates a slot this same checkout just took.
     """
+    _expire_stale()
     user = current_user()
     assert user is not None  # guaranteed by role_required
     case = _own_case_or_404(case_id)
@@ -381,7 +509,7 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
     except SlotTakenError as exc:
         flash(str(exc), "error")
         return _render_book_form(case, professor, profile, match, 409)
-    flash("Session booked. The meeting link is on this page.", "success")
+    flash("Session requested.", "success")
     try:
         send_booking_emails(booking.id)
     except Exception:  # noqa: BLE001 — email must never break the booking
@@ -396,6 +524,7 @@ def book_submit(case_id: int, professor_id: int) -> Response | tuple[str, int]:
 @role_required("student")
 def sessions_list() -> str:
     """Student's bookings, soonest first."""
+    _expire_stale()
     user = current_user()
     assert user is not None  # guaranteed by role_required
     bookings = (
@@ -417,10 +546,8 @@ def sessions_list() -> str:
 @role_required("student")
 def confirmation(booking_id: int) -> str:
     """Post-checkout receipt; the 303 target, safe to refresh and share."""
-    booking = db.session.get(Booking, booking_id)
-    user = current_user()
-    if booking is None or user is None or booking.student_id != user.id:
-        abort(404)
+    _expire_stale()
+    booking = _own_student_booking_or_404(booking_id)
     professor = db.session.get(User, booking.professor_id)
     return render_template(
         "cases/confirmation.html", booking=booking, professor=professor
@@ -430,11 +557,9 @@ def confirmation(booking_id: int) -> str:
 @bp.get("/sessions/<int:booking_id>")
 @role_required("student")
 def session_detail(booking_id: int) -> str:
-    """One booking: slot, meeting link, case, consent and demo receipt."""
-    booking = db.session.get(Booking, booking_id)
-    user = current_user()
-    if booking is None or user is None or booking.student_id != user.id:
-        abort(404)
+    """One booking: status, slot, gated link, case, consent, demo receipt."""
+    _expire_stale()
+    booking = _own_student_booking_or_404(booking_id)
     professor = db.session.get(User, booking.professor_id)
     case = db.session.get(CaseFile, booking.case_id) if booking.case_id else None
     return render_template(
@@ -442,4 +567,67 @@ def session_detail(booking_id: int) -> str:
         booking=booking,
         professor=professor,
         case=case,
+    )
+
+
+@bp.post("/sessions/<int:booking_id>/cancel")
+@role_required("student")
+def student_cancel(booking_id: int) -> Response:
+    """Withdraw a pending request; the demo hold is released."""
+    _expire_stale()
+    booking = _own_student_booking_or_404(booking_id)
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    try:
+        apply_transition(booking.id, "cancel", actor_user=user)
+    except BookingAuthError:
+        abort(403)
+    except (InvalidTransitionError, SlotTakenError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash("Request cancelled. The demo hold was released.", "success")
+    return redirect(
+        url_for("cases.session_detail", booking_id=booking.id), code=303
+    )
+
+
+@bp.post("/sessions/<int:booking_id>/proposal/accept")
+@role_required("student")
+def student_accept_proposal(booking_id: int) -> Response:
+    """Take the professor's alternative slot; the session is accepted."""
+    _expire_stale()
+    booking = _own_student_booking_or_404(booking_id)
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    try:
+        apply_transition(booking.id, "accept_proposal", actor_user=user)
+    except BookingAuthError:
+        abort(403)
+    except (InvalidTransitionError, SlotTakenError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash("New time accepted. The meeting link is on this page.", "success")
+    return redirect(
+        url_for("cases.session_detail", booking_id=booking.id), code=303
+    )
+
+
+@bp.post("/sessions/<int:booking_id>/proposal/decline")
+@role_required("student")
+def student_decline_proposal(booking_id: int) -> Response:
+    """Turn down the alternative; the request is cancelled and released."""
+    _expire_stale()
+    booking = _own_student_booking_or_404(booking_id)
+    user = current_user()
+    assert user is not None  # guaranteed by role_required
+    try:
+        apply_transition(booking.id, "decline_proposal", actor_user=user)
+    except BookingAuthError:
+        abort(403)
+    except (InvalidTransitionError, SlotTakenError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash("Proposal declined. The demo hold was released.", "success")
+    return redirect(
+        url_for("cases.session_detail", booking_id=booking.id), code=303
     )

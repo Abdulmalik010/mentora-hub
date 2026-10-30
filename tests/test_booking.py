@@ -107,7 +107,7 @@ def test_format_wat() -> None:
 
 
 def test_create_booking_and_double_booking(app: Flask) -> None:
-    """Create confirms with link and ref; the same slot cannot book twice."""
+    """Create requests with held payment; the same slot cannot book twice."""
     case, prof_id = seed_booking_case()
     start = datetime(2026, 11, 4, 9, 0)
     booking = create_booking(
@@ -115,7 +115,9 @@ def test_create_booking_and_double_booking(app: Flask) -> None:
         start_naive_utc=start, consent_share_diagnosis=True,
         idempotency_key="tok-book-1",
     )
-    assert booking.status == "confirmed"
+    assert booking.status == "requested"
+    assert booking.payment_status == "held"
+    assert booking.expires_at is not None and booking.expires_at > booking.created_at
     assert booking.meeting_url.startswith("https://meet.jit.si/mentora-")
     assert booking.mock_payment_ref.startswith("DEMO-")
     assert booking.consent_share_diagnosis is True
@@ -227,7 +229,7 @@ def test_book_page_requires_match(app: Flask) -> None:
 
 
 def test_book_post_full_flow(app: Flask) -> None:
-    """Pick slot, consent, submit: 303 to a confirmation with link and ref."""
+    """Pick slot, consent, submit: 303 to a requested confirmation, no link."""
     from app.models import ProfessorProfile
 
     case, prof_id = seed_booking_case()
@@ -245,16 +247,22 @@ def test_book_post_full_flow(app: Flask) -> None:
     assert response.status_code == 303
     booking = Booking.query.one()
     assert response.location.endswith(f"/sessions/{booking.id}/confirmation")
+    assert booking.status == "requested"
     assert booking.consent_share_diagnosis is True
     confirmation = client.get(f"/sessions/{booking.id}/confirmation")
     assert confirmation.status_code == 200
     html = confirmation.get_data(as_text=True)
-    assert "meet.jit.si/mentora-" in html
-    assert "WAT" in html
-    assert "DEMO-" in html and "nothing charged" in html
+    assert "Session requested" in html
+    assert "48 hours" in html and "held (demo)" in html
+    assert "meet.jit.si/mentora-" not in html
+    assert "DEMO-" in html
     detail = client.get(f"/sessions/{booking.id}")
     assert detail.status_code == 200
-    assert "Shared with professor" in detail.get_data(as_text=True)
+    detail_html = detail.get_data(as_text=True)
+    assert "Shared with professor" in detail_html
+    assert "requested" in detail_html
+    assert "meet.jit.si/mentora-" not in detail_html
+    assert "Cancel request" in detail_html
     listing = client.get("/sessions")
     assert listing.status_code == 200
     assert "Dr. Chiamaka Obi" in listing.get_data(as_text=True)

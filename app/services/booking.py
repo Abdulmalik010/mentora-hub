@@ -3,12 +3,25 @@ from __future__ import annotations
 
 import secrets
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from ..extensions import db
 from ..models import Booking
+
+STATUS_REQUESTED = "requested"
+STATUS_ACCEPTED = "accepted"
+STATUS_DECLINED = "declined"
+STATUS_PROPOSED = "reschedule_proposed"
+STATUS_CANCELLED = "cancelled"
+STATUS_EXPIRED = "expired"
+STATUS_COMPLETED = "completed"
+
+ACTIVE_STATUSES = frozenset(
+    {STATUS_REQUESTED, STATUS_ACCEPTED, STATUS_PROPOSED}
+)
+EXPIRY_HOURS = 48
 
 MEETING_ROOM_PREFIX = "mentora-"
 COMMIT_RETRIES = 3
@@ -40,12 +53,13 @@ def create_booking(
     consent_share_diagnosis: bool,
     idempotency_key: str,
 ) -> Booking:
-    """Persist one booking; SlotTakenError when the slot is gone.
+    """Persist one booking as requested; SlotTakenError when occupied.
 
-    Consent is mandatory. A pre-check gives the friendly path; the
-    (professor, start) unique constraint is the race-safe backstop, with a
-    short retry on transient SQLite lock errors. A token that already
-    produced a booking raises DuplicateCheckoutError with that booking.
+    Consent is mandatory. Only active statuses occupy a slot (pre-check
+    plus the partial unique backstop), with a short retry on transient
+    SQLite lock errors. A token that already produced a booking raises
+    DuplicateCheckoutError with that booking. Payment is held (demo) and
+    the request expires after 48 hours.
     """
     if not consent_share_diagnosis:
         raise ValueError("consent to share the diagnosis is required")
@@ -54,18 +68,25 @@ def create_booking(
     duplicate = Booking.query.filter_by(idempotency_key=idempotency_key).first()
     if duplicate is not None:
         raise DuplicateCheckoutError(duplicate)
-    taken = Booking.query.filter_by(
-        professor_id=professor_id, scheduled_at=start_naive_utc
-    ).first()
+    taken = (
+        Booking.query.filter_by(
+            professor_id=professor_id, scheduled_at=start_naive_utc
+        )
+        .filter(Booking.status.in_(ACTIVE_STATUSES))
+        .first()
+    )
     if taken is not None:
         raise SlotTakenError("that slot was just booked; pick another")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     booking = Booking(
         student_id=student_id,
         professor_id=professor_id,
         case_id=case_id,
         idempotency_key=idempotency_key,
-        status="confirmed",
+        status="requested",
         scheduled_at=start_naive_utc,
+        expires_at=now + timedelta(hours=EXPIRY_HOURS),
+        payment_status="held",
         meeting_url=meeting_url(),
         consent_share_diagnosis=True,
         mock_payment_ref=f"DEMO-{secrets.token_hex(4).upper()}",

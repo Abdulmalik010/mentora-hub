@@ -112,8 +112,15 @@ def test_case_file_page_matches_email(app: Flask) -> None:
     ):
         assert snippet in email.text
         assert snippet in html
-    assert (booking.meeting_url or "") in html
-    main = html.split("<main", 1)[1]  # read-only: no forms past the nav
+    assert "Respond to this request" in html  # actions while requested
+    assert (booking.meeting_url or "") not in html  # link hidden until accept
+    from app.services.booking_workflow import apply_transition
+
+    apply_transition(booking.id, "accept", actor_user=professor)
+    decided = client.get(f"/dashboard/bookings/{booking.id}")
+    decided_html = decided.get_data(as_text=True)
+    assert (booking.meeting_url or "") in decided_html
+    main = decided_html.split("<main", 1)[1]  # decided: no forms past the nav
     assert "<form" not in main
 
 

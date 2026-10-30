@@ -1,29 +1,49 @@
 {% extends "base.html" %}
-{% from "_ui.html" import card, button, badge %}
-{% block title %}Booking confirmed · Mentora Academic Hub{% endblock %}
+{% from "_ui.html" import card, button, badge, status_chip %}
+{% block title %}Session requested · Mentora Academic Hub{% endblock %}
 {% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}
 {% block content %}
-{% call card("Booking confirmed") %}
-  <dl class="mt-3 space-y-3 text-sm">
-    <div><dt class="text-muted">Professor</dt>
-      <dd class="font-semibold">{{ professor.display_name if professor else "Unknown" }}</dd>
+{% if booking.status == "requested" %}
+  {% call card("Session requested") %}
+    <p class="mt-2 text-sm leading-relaxed">
+      Session requested. {{ professor.display_name if professor else "The professor" }} has up to
+      48 hours to respond. Your payment is held (demo).
+    </p>
+    <dl class="mt-4 space-y-3 text-sm">
+      <div><dt class="text-muted">When</dt>
+        <dd class="font-semibold">{{ booking.scheduled_at|wat }} · 60 minutes</dd>
+        <dd class="text-xs text-muted">your time: <span data-utc="{{ booking.scheduled_at|utc_iso }}">…</span></dd>
+      </div>
+      <div><dt class="text-muted">Receipt</dt>
+        <dd class="text-muted">{{ booking.mock_payment_ref or "—" }} · demo, held not charged</dd>
+      </div>
+    </dl>
+    <div class="mt-6 flex flex-wrap gap-3">
+      {{ button("View session", href=url_for("cases.session_detail", booking_id=booking.id)) }}
+      {{ button("All sessions", href=url_for("cases.sessions_list"), variant="secondary") }}
     </div>
-    <div><dt class="text-muted">When</dt>
-      <dd class="font-semibold">{{ booking.scheduled_at|wat }} · 60 minutes</dd>
-      <dd class="text-xs text-muted">your time: <span data-utc="{{ booking.scheduled_at|utc_iso }}">…</span></dd>
+  {% endcall %}
+{% else %}
+  {% call card("Session " + booking.status.replace("_", " ")) %}
+    <p class="mt-2">{{ status_chip(booking.status) }}</p>
+    <dl class="mt-4 space-y-3 text-sm">
+      <div><dt class="text-muted">Professor</dt>
+        <dd class="font-semibold">{{ professor.display_name if professor else "Unknown" }}</dd>
+      </div>
+      <div><dt class="text-muted">When</dt>
+        <dd class="font-semibold">{{ booking.scheduled_at|wat }} · 60 minutes</dd>
+      </div>
+      {% if booking.status == "accepted" and booking.meeting_url %}
+        <div><dt class="text-muted">Meeting link</dt>
+          <dd><a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a></dd>
+        </div>
+      {% endif %}
+    </dl>
+    <div class="mt-6 flex flex-wrap gap-3">
+      {{ button("View session", href=url_for("cases.session_detail", booking_id=booking.id)) }}
     </div>
-    <div><dt class="text-muted">Meeting link</dt>
-      <dd>{% if booking.meeting_url %}<a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a>{% else %}—{% endif %}</dd>
-    </div>
-    <div><dt class="text-muted">Receipt</dt>
-      <dd class="text-muted">{{ booking.mock_payment_ref or "—" }} · demo, nothing charged</dd>
-    </div>
-  </dl>
-  <div class="mt-6 flex flex-wrap gap-3">
-    {{ button("View session", href=url_for("cases.session_detail", booking_id=booking.id)) }}
-    {{ button("All sessions", href=url_for("cases.sessions_list"), variant="secondary") }}
-  </div>
-{% endcall %}
+  {% endcall %}
+{% endif %}
 {% endblock %}
 {% block scripts %}
 <script>

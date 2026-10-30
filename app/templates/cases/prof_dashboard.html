@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_ui.html" import card, badge, section_header, empty_state %}
+{% from "_ui.html" import card, badge, section_header, empty_state, status_chip %}
 {% block title %}Dashboard · Mentora Academic Hub{% endblock %}
 {% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
@@ -20,12 +20,12 @@
               {% endif %}
             </div>
             <div class="flex shrink-0 flex-col items-end gap-2">
-              {{ badge(booking.status, tone="ok" if booking.status == "confirmed" else "neutral") }}
+              {{ status_chip(booking.status) }}
               <a href="{{ url_for('cases.professor_case_file', booking_id=booking.id) }}"
                   class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover">
                 Open case file
               </a>
-              {% if booking.meeting_url %}
+              {% if booking.status == "accepted" and booking.meeting_url %}
                 <a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="text-sm font-semibold text-brand hover:text-brand-hover">Join video ↗</a>
               {% endif %}
             </div>

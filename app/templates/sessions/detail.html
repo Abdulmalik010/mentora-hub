@@ -1,10 +1,25 @@
 {% extends "base.html" %}
-{% from "_ui.html" import card, button, badge %}
+{% from "_ui.html" import card, button, badge, status_chip %}
 {% block title %}Session · Mentora Academic Hub{% endblock %}
 {% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}
 {% block content %}
 <p class="mb-4 text-sm font-semibold text-brand"><a href="{{ url_for('cases.sessions_list') }}" class="hover:text-brand-hover">← All sessions</a></p>
-{% call card("Session booked") %}
+<div class="mb-4 flex items-center gap-3">
+  <h1 class="font-display text-2xl font-semibold tracking-tight">Session</h1>
+  {{ status_chip(booking.status) }}
+</div>
+{% if booking.status == "requested" %}
+  <p class="mb-4 rounded-xl border border-info/30 bg-info/10 px-4 py-3 text-sm">Waiting on the professor — they have up to 48 hours to respond. Your payment is held (demo).</p>
+{% elif booking.status == "reschedule_proposed" and booking.proposed_start %}
+  <p class="mb-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm">New time offered: <strong class="font-semibold">{{ booking.proposed_start|wat }}</strong>. Accept it or decline below.</p>
+{% elif booking.status == "declined" and booking.decline_reason %}
+  <p class="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm">Declined: {{ booking.decline_reason }}</p>
+{% elif booking.status == "expired" %}
+  <p class="mb-4 rounded-xl border border-border bg-paper px-4 py-3 text-sm">This request expired after 48 hours without a response. The demo hold was released.</p>
+{% elif booking.status == "cancelled" %}
+  <p class="mb-4 rounded-xl border border-border bg-paper px-4 py-3 text-sm">Cancelled. The demo hold was released.</p>
+{% endif %}
+{% call card("Details") %}
   <dl class="mt-3 space-y-3 text-sm">
     <div><dt class="text-muted">Professor</dt>
       <dd class="font-semibold">
@@ -16,7 +31,13 @@
       <dd class="text-xs text-muted">your time: <span data-utc="{{ booking.scheduled_at|utc_iso }}">…</span></dd>
     </div>
     <div><dt class="text-muted">Meeting link</dt>
-      <dd>{% if booking.meeting_url %}<a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a>{% else %}—{% endif %}</dd>
+      <dd>
+        {% if booking.status == "accepted" and booking.meeting_url %}
+          <a href="{{ booking.meeting_url }}" target="_blank" rel="noopener" class="font-semibold text-brand hover:text-brand-hover">Join video session ↗</a>
+        {% else %}
+          <span class="text-muted">Revealed once the professor accepts.</span>
+        {% endif %}
+      </dd>
     </div>
     {% if case %}
       <div><dt class="text-muted">Case</dt>
@@ -26,10 +47,27 @@
     <div><dt class="text-muted">Diagnosis sharing</dt>
       <dd>{% if booking.consent_share_diagnosis %}{{ badge("Shared with professor", tone="ok") }}{% else %}{{ badge("Not shared", tone="neutral") }}{% endif %}</dd>
     </div>
-    <div><dt class="text-muted">Receipt</dt>
-      <dd class="text-muted">{{ booking.mock_payment_ref or "—" }} · demo, nothing charged</dd>
+    <div><dt class="text-muted">Payment (demo)</dt>
+      <dd class="text-muted">{{ booking.mock_payment_ref or "—" }} · {{ booking.payment_status or "—" }}</dd>
     </div>
   </dl>
+  {% if booking.status == "requested" %}
+    <form method="post" action="{{ url_for('cases.student_cancel', booking_id=booking.id) }}" class="mt-5 border-t border-border pt-4">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="rounded-lg border border-danger/40 px-4 py-2 text-sm font-semibold text-danger hover:bg-danger/10">Cancel request</button>
+    </form>
+  {% elif booking.status == "reschedule_proposed" %}
+    <div class="mt-5 flex flex-wrap gap-3 border-t border-border pt-4">
+      <form method="post" action="{{ url_for('cases.student_accept_proposal', booking_id=booking.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover">Accept new time</button>
+      </form>
+      <form method="post" action="{{ url_for('cases.student_decline_proposal', booking_id=booking.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="rounded-lg border border-danger/40 px-4 py-2 text-sm font-semibold text-danger hover:bg-danger/10">Decline</button>
+      </form>
+    </div>
+  {% endif %}
 {% endcall %}
 {% endblock %}
 {% block scripts %}

@@ -79,6 +79,14 @@
 <span class="inline-block rounded-full border px-2.5 py-0.5 text-xs font-semibold {{ tones.get(tone, tones['neutral']) }}">{{ text }}</span>
 {% endmacro %}
 
+{% macro status_chip(status) %}
+{% set tones = {"requested": "info", "accepted": "ok", "declined": "bad",
+  "reschedule_proposed": "warn", "cancelled": "neutral", "expired": "neutral",
+  "completed": "ok", "confirmed": "ok", "pending": "neutral"} %}
+{% set labels = {"reschedule_proposed": "reschedule proposed"} %}
+{{ badge(labels.get(status, status), tone=tones.get(status, "neutral")) }}
+{% endmacro %}
+
 {% macro section_header(title, subtitle=None) %}
 <div class="mb-6">
   <h1 class="font-display text-2xl font-semibold tracking-tight">{{ title }}</h1>

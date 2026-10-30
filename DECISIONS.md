@@ -72,3 +72,9 @@
 - 2026-10-30: Checkout bug: duplicate POSTs re-validated the slot against a grid the first request had already mutated (400 "Pick a valid slot" despite a created booking); retries on other slots duplicated bookings.
 - 2026-10-30: Checkout carries a per-render idempotency token (unique Booking.idempotency_key), resolved before slot validation; retries 303 to the same confirmation; checkout ends in 303, never 302.
 - 2026-10-30: Tests stub werkzeug scrypt with a behavior-preserving fast hash (login right/wrong/NULL/empty semantics intact); suite 277s to 36s, production hashing unchanged.
+- 2026-10-30: Sessions are requested, not booked: requested|accepted|declined|reschedule_proposed|cancelled|expired|completed; checkout creates requested with a held demo payment and 48h expiry.
+- 2026-10-30: Full unique(professor,start) replaced by a partial unique index over active statuses (sqlite_where/postgresql_where); terminal bookings vacate the slot. Recreate dev DBs.
+- 2026-10-30: Request state machine is an explicit 8-edge TRANSITIONS table with conditional-UPDATE flips (lost races see rowcount 0); professor-only accept/decline/propose, student-only cancel/answer; completed has no inbound transition yet.
+- 2026-10-30: Proposed slots must be future and unoccupied (checked, not grid-locked); proposal acceptance re-checks plus the index backstop.
+- 2026-10-30: Meeting links are minted at request time but revealed only when accepted (display gating, no second link).
+- 2026-10-30: Request expiry is a lazy sweep on booking reads plus a `flask expire-requests` CLI command; expiry releases slot and payment.

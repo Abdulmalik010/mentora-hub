@@ -23,6 +23,7 @@ from app.services.clarification import (
 from app.services.diagnosis import _run_clarification_phase, run_post_answer_matching
 from app.services.matching import run_matching
 from app.services.meta_client import ChatResult
+from scripts.seed import seed_database
 from tests.test_booking import login_sample_student
 from tests.test_matching import FakeMatchClient, make_ranking, seed_match_case
 
@@ -414,6 +415,25 @@ def test_post_answer_matching_finishes(app: Flask) -> None:
     db.session.refresh(case)
     assert case.status == "done"
     assert MatchResult.query.filter_by(case_id=case.id).count() == 3
+
+
+def test_pipeline_pauses_for_answers(app: Flask, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Full pipeline with real questions pauses before matching (faked)."""
+    from app.services.diagnosis import run_case_pipeline
+    from tests.test_parallel import RoutingFake, seed_parallel_case
+
+    seed_database()
+    case = seed_parallel_case(app, tmp_path)
+    run_case_pipeline(
+        app, case.id, "run-full-1",
+        chat_client=RoutingFake(), model="fake-diagnosis",
+        clarify_client=ClarifyFake(CANNED_QUESTIONS),
+        clarify_model="fake-clarify",
+    )
+    db.session.refresh(case)
+    assert case.status == "awaiting_answers"
+    assert ClarificationQA.query.filter_by(case_id=case.id).count() == 2
+    assert MatchResult.query.filter_by(case_id=case.id).count() == 0
 
 
 def test_match_page_shows_applied_filters(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]

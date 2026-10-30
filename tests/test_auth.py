@@ -5,7 +5,6 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from app.models import ProfessorProfile, StudentProfile, User
-from app.security import login_required, role_required
 from scripts.seed import seed_database
 
 STUDENT = {
@@ -172,14 +171,7 @@ def test_post_without_csrf_token_rejected(tmp_path) -> None:  # type: ignore[no-
 
 def test_login_required_and_role_required_guards(app: Flask) -> None:
     """Anonymous users redirect; wrong roles get 403; right roles pass."""
-    app.add_url_rule(
-        "/_guarded", endpoint="_guarded", view_func=login_required(lambda: "guarded-ok")
-    )
-    app.add_url_rule(
-        "/_prof-only",
-        endpoint="_prof-only",
-        view_func=role_required("professor")(lambda: "prof-ok"),
-    )
+    # Probe routes are registered once on the session app (see conftest).
     client = app.test_client()
 
     anonymous = client.get("/_prof-only", follow_redirects=False)

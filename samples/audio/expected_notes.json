@@ -1,0 +1,28 @@
+{
+  "session_sample_16k.wav": {
+    "label": "[SAMPLE DATA - synthetic supervision session for development and demo only.]",
+    "action_items": [
+      {
+        "id": "rerun-regression",
+        "owner": "student",
+        "task": "Rerun the regression with robust standard errors.",
+        "due": null,
+        "keywords": ["rerun", "regression", "robust", "standard errors"]
+      },
+      {
+        "id": "rewrite-limitations",
+        "owner": "student",
+        "task": "Rewrite the limitations section.",
+        "due": null,
+        "keywords": ["rewrite", "limitations"]
+      },
+      {
+        "id": "send-chapter",
+        "owner": "student",
+        "task": "Send the revised chapter by Friday.",
+        "due": "Friday",
+        "keywords": ["send", "revised chapter", "friday"]
+      }
+    ]
+  }
+}

@@ -479,11 +479,15 @@ def test_full_pipeline_includes_matching(app: Flask, tmp_path) -> None:  # type:
     case = seed_parallel_case(app, tmp_path)
     from app.services.diagnosis import run_case_pipeline
 
+    from tests.test_clarification import ClarifyFake
+
     run_case_pipeline(
         app, case.id, "run-full-1",
         chat_client=RoutingFake(), model="fake-diagnosis",
         match_client=FakeMatchClient([make_ranking(12, 2, 1)]),
         match_model="fake-match",
+        clarify_client=ClarifyFake({"questions": []}),
+        clarify_model="fake-clarify",
     )
     db.session.refresh(case)
     assert case.status == "done"

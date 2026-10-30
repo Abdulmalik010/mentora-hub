@@ -110,6 +110,7 @@ scripts/make_samples.py regenerates samples/ fixtures
 scripts/make_matching_cases.py regenerates eval/matching_cases.json
 scripts/eval_diagnosis.py live diagnosis eval (never run by pytest)
 scripts/eval_matching.py live matching eval (never run by pytest)
+scripts/eval_notes.py live notes eval (never run by pytest)
 samples/             synthetic thesis excerpts + expected.json (demo fixtures)
 eval/                40 generated matching-eval cases
 docs/eval/           eval reports (written by the eval scripts)
@@ -169,6 +170,7 @@ Live scripts (real Meta calls, real credit; never run by pytest):
 ```powershell
 python -m scripts.eval_diagnosis [--mode both|parallel|single] [--reps 3]
 python -m scripts.eval_matching [--limit N] [--mode fast|agentic] [--rank-model spark|wonder]
+python -m scripts.eval_notes [--reps 3] [--audio samples/audio/session_sample_16k.wav]
 python -m scripts.make_matching_cases   # regenerate eval/matching_cases.json
 ```
 
@@ -176,7 +178,11 @@ python -m scripts.make_matching_cases   # regenerate eval/matching_cases.json
 repeated runs (planted-flaw recall, grounding rate, latency, tokens) and
 writes `docs/eval/diagnosis.md`. `eval_matching` runs the 40 generated cases
 (top-1/top-3 accuracy, latency, tokens) and writes `docs/eval/matching.md`.
-Both need `META_API_KEY` plus the `META_MODEL_*` ids in `.env`;
+`eval_notes` runs the real transcribe→draft→review chain over the sample
+clip and scores action-item recall against
+`samples/audio/expected_notes.json` (plus fidelity and per-stage latency),
+writing `docs/eval/notes.md`; each rep spends one ASR call plus two chat
+calls. All need `META_API_KEY` plus the `META_MODEL_*` ids in `.env`;
 `eval_matching` also needs `SEED_DEMO_PASSWORD`. Start matching with
 `--limit 3`: a full run is 40 agent calls. Before changing the rank-model
 default, compare quality on 10 cases:

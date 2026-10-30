@@ -1,4 +1,5 @@
 """Shared Flask extensions, instantiated once and attached in the app factory."""
+import os
 import sqlite3
 
 from flask_sqlalchemy import SQLAlchemy
@@ -17,4 +18,8 @@ def _set_sqlite_pragmas(dbapi_connection: object, connection_record: object) -> 
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=5000")
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            # Tests only: skip per-commit fsync (same SQL, same results,
+            # no crash-safety needs). Production keeps FULL durability.
+            cursor.execute("PRAGMA synchronous=OFF")
         cursor.close()

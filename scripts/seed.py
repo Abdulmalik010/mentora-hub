@@ -8,8 +8,10 @@ is synthetic sample data (``is_sample=True``,
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 
 from app import create_app
+from app import models as _models
 from app.extensions import db
 from app.models import ProfessorProfile, StudentProfile, User
 
@@ -188,9 +190,102 @@ def seed_database() -> dict[str, int]:
 
     Must run inside an app context. Existing sample rows (matched by email)
     are refreshed to the canonical spec values, so re-runs are convergent
-    no-ops once the database matches the spec.
+    no-ops once the database matches the spec. Fresh databases take a bulk
+    fast path; anything else refreshes row by row.
     """
     password = _demo_password()
+    if User.query.count() == 0:
+        _seed_fresh(password)
+    else:
+        _seed_incremental(password)
+    db.session.commit()
+    professors = User.query.filter_by(role="professor", is_sample=True).count()
+    students = User.query.filter_by(role="student", is_sample=True).count()
+    return {"professors": professors, "students": students}
+
+
+def _seed_fresh(password: str) -> None:
+    """Bulk insert for empty databases (same rows, ~10x fewer queries).
+
+    Insertion order matches the incremental path exactly (professors
+    first), so seeded user ids stay deterministic 1..38.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Via app.models so the test-suite hash stub applies (same stored values).
+    hashed = _models.generate_password_hash(password)
+    users: list[dict[str, object]] = []
+    for i, ((_dept, _areas, _blurb), ident) in enumerate(
+        zip(PROFESSOR_SPECS, PROFESSOR_NAMES), 1
+    ):
+        first_name, last_name, title, _rank = ident
+        users.append(
+            {
+                "email": f"sample-professor-{i:02d}@example.com",
+                "password_hash": hashed,
+                "display_name": f"{title} {first_name} {last_name}",
+                "role": "professor",
+                "is_sample": True,
+                "created_at": now,
+            }
+        )
+    for i in range(1, 4):
+        users.append(
+            {
+                "email": f"sample-student-0{i}@example.com",
+                "password_hash": hashed,
+                "display_name": f"Sample Student 0{i}",
+                "role": "student",
+                "is_sample": True,
+                "created_at": now,
+            }
+        )
+    db.session.bulk_insert_mappings(User, users)
+    ids = dict(db.session.query(User.email, User.id).all())
+    profiles: list[dict[str, object]] = []
+    for i, ((dept, areas, blurb), ident) in enumerate(
+        zip(PROFESSOR_SPECS, PROFESSOR_NAMES), 1
+    ):
+        first_name, last_name, title, rank = ident
+        profiles.append(
+            {
+                "user_id": ids[f"sample-professor-{i:02d}@example.com"],
+                "first_name": first_name,
+                "last_name": last_name,
+                "title": title,
+                "rank": rank,
+                "department": dept,
+                "research_areas": list(areas),
+                "bio": f"{SAMPLE_BIO} {blurb}",
+                "rate": 10000.0 + i * 1000.0,
+                "timezone": "Africa/Lagos",
+                "availability": {
+                    "days": ["Monday", "Wednesday", "Friday"][0 : (i % 3) + 1],
+                    "windows": [["10:00", "14:00"]],
+                },
+                "accepting_new": True,
+                "created_at": now,
+            }
+        )
+    db.session.bulk_insert_mappings(ProfessorProfile, profiles)
+    db.session.bulk_insert_mappings(
+        StudentProfile,
+        [
+            {
+                "user_id": ids[f"sample-student-0{i}@example.com"],
+                "level": level,
+                "field": field,
+                "created_at": now,
+            }
+            for i, (level, field) in enumerate(
+                zip(STUDENT_LEVELS, STUDENT_FIELDS), 1
+            )
+        ],
+    )
+
+
+def _seed_incremental(password: str) -> None:
+    """Row-by-row refresh for databases that already hold users."""
+    hashed = _models.generate_password_hash(password)
     for i, ((dept, areas, blurb), ident) in enumerate(
         zip(PROFESSOR_SPECS, PROFESSOR_NAMES), 1
     ):
@@ -203,7 +298,7 @@ def seed_database() -> dict[str, int]:
             is_sample=True,
         )
         if user.password_hash is None:
-            user.set_password(password)
+            user.password_hash = hashed
         if user.is_sample:
             user.display_name = display_name
         profile_fields = {
@@ -236,16 +331,11 @@ def seed_database() -> dict[str, int]:
             is_sample=True,
         )
         if user.password_hash is None:
-            user.set_password(password)
+            user.password_hash = hashed
         if user.student_profile is None:
             db.session.add(
                 StudentProfile(user_id=user.id, level=level, field=field)
             )
-
-    db.session.commit()
-    professors = User.query.filter_by(role="professor", is_sample=True).count()
-    students = User.query.filter_by(role="student", is_sample=True).count()
-    return {"professors": professors, "students": students}
 
 
 def main() -> None:

@@ -11,4 +11,5 @@ MENTORA_CONTEXT.md
 
 MENTORA_CONTEXT.md
 
-samples/audio/
+# Sample audio stays local (binaries); eval fixtures like expected_notes.json are tracked.
+samples/audio/*.wav

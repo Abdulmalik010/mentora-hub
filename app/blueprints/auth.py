@@ -14,17 +14,12 @@ from flask import (
 
 from ..extensions import db
 from ..models import ProfessorProfile, StudentProfile, User
+from ..services.profiles import department_choices
 
 bp = Blueprint("auth", __name__)
 
 VALID_ROLES = ("student", "professor")
 STUDENT_LEVELS = ("undergraduate", "masters", "phd")
-DEPARTMENTS = (
-    "Statistics",
-    "Computer Science",
-    "Economics",
-    "English Literature",
-)
 MIN_PASSWORD_LEN = 8
 
 
@@ -36,7 +31,11 @@ def health() -> dict[str, str]:
 
 def _register_context() -> dict[str, object]:
     """Select options shared by the register form renders."""
-    return {"roles": VALID_ROLES, "levels": STUDENT_LEVELS, "departments": DEPARTMENTS}
+    return {
+        "roles": VALID_ROLES,
+        "levels": STUDENT_LEVELS,
+        "departments": department_choices(),
+    }
 
 
 @bp.get("/register")
@@ -65,7 +64,7 @@ def register() -> Response | tuple[str, int]:
         error = "That email is already registered."
     elif role == "student" and (level not in STUDENT_LEVELS or not field):
         error = "Students need a level and a field of study."
-    elif role == "professor" and department not in DEPARTMENTS:
+    elif role == "professor" and department not in department_choices():
         error = "Professors need a department."
     if error is not None:
         flash(error, "error")

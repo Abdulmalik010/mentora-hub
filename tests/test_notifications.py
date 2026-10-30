@@ -112,7 +112,7 @@ def test_accept_notifies_and_mails_both(app: Flask) -> None:
     assert [(note.kind, note.url) for note in notes] == [
         (KIND_ACCEPTED, f"/sessions/{booking.id}")
     ]
-    assert "Dr. Chiamaka Obi" in notes[0].title
+    assert "Dr. Lars Johansson" in notes[0].title
     kinds = {
         row.kind
         for row in EmailLog.query.filter_by(booking_id=booking.id).all()

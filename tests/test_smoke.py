@@ -56,13 +56,13 @@ def test_models_import_and_tables_exist(app: Flask) -> None:
     assert User.query.count() == 0
 
 
-def test_seed_yields_20_professors_and_3_students(app: Flask) -> None:
-    """Seed produces 20 professors across 4 departments and 3 students."""
+def test_seed_yields_35_professors_and_3_students(app: Flask) -> None:
+    """Seed produces 35 professors across 15 departments and 3 students."""
     counts = seed_database()
-    assert counts == {"professors": 20, "students": 3}
-    assert User.query.filter_by(role="professor").count() == 20
+    assert counts == {"professors": 35, "students": 3}
+    assert User.query.filter_by(role="professor").count() == 35
     assert User.query.filter_by(role="student").count() == 3
-    assert ProfessorProfile.query.count() == 20
+    assert ProfessorProfile.query.count() == 35
     assert StudentProfile.query.count() == 3
     departments = {
         row[0] for row in db.session.query(ProfessorProfile.department).distinct()
@@ -72,6 +72,17 @@ def test_seed_yields_20_professors_and_3_students(app: Flask) -> None:
         "Computer Science",
         "Economics",
         "English Literature",
+        "Biology",
+        "Chemistry",
+        "Physics",
+        "Mathematics",
+        "Civil Engineering",
+        "Electrical Engineering",
+        "Law",
+        "Education",
+        "Psychology",
+        "Business Administration",
+        "Agricultural Science",
     }
     assert User.query.filter_by(is_sample=False).count() == 0
 
@@ -80,8 +91,39 @@ def test_seed_is_idempotent(app: Flask) -> None:
     """A second seed run creates nothing new."""
     first = seed_database()
     second = seed_database()
-    assert first == second == {"professors": 20, "students": 3}
-    assert ProfessorProfile.query.count() == 20
+    assert first == second == {"professors": 35, "students": 3}
+    assert ProfessorProfile.query.count() == 35
+
+
+def test_seed_departments_have_two_or_three_professors(app: Flask) -> None:
+    """Every seeded department carries 2-3 professors, 35 in total."""
+    from sqlalchemy import func
+
+    seed_database()
+    rows = (
+        db.session.query(ProfessorProfile.department, func.count())
+        .group_by(ProfessorProfile.department)
+        .all()
+    )
+    assert len(rows) == 15
+    assert sum(count for _, count in rows) == 35
+    for department, count in rows:
+        assert count in (2, 3), f"{department} has {count} professors"
+
+
+def test_seed_excludes_banned_departments(app: Flask) -> None:
+    """No political science or clinical medicine anywhere in the seed."""
+    from scripts.seed import DEPARTMENTS, PROFESSOR_SPECS
+
+    seed_database()
+    banned = {"political science", "clinical medicine"}
+    assert not (banned & {name.lower() for name in DEPARTMENTS})
+    for dept, areas, _blurb in PROFESSOR_SPECS:
+        assert dept.lower() not in banned
+        for area in areas:
+            assert area.lower() not in banned
+    rows = db.session.query(ProfessorProfile.department).distinct().all()
+    assert not (banned & {row[0].lower() for row in rows})
 
 
 def test_seed_sets_fictional_professor_names(app: Flask) -> None:
@@ -97,13 +139,19 @@ def test_seed_sets_fictional_professor_names(app: Flask) -> None:
     twelfth = User.query.filter_by(
         email="sample-professor-12@example.com"
     ).one()
-    assert twelfth.display_name == "Dr. Chiamaka Obi"
+    assert twelfth.display_name == "Dr. Lars Johansson"
     assert twelfth.professor_profile.rank == "Senior Lecturer"
+    assert twelfth.professor_profile.department == "Biology"
+    eighth = User.query.filter_by(
+        email="sample-professor-08@example.com"
+    ).one()
+    assert eighth.display_name == "Dr. Chiamaka Obi"
+    assert eighth.professor_profile.department == "Economics"
     names = [
         user.display_name
         for user in User.query.filter_by(role="professor").all()
     ]
-    assert len(set(names)) == 20
+    assert len(set(names)) == 35
     assert all("Sample Professor" not in name for name in names)
     seed_database()  # re-run keeps the canonical names (convergent refresh)
     assert (

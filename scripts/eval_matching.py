@@ -3,7 +3,7 @@
 Usage: ``python -m scripts.eval_matching [--limit N]``. Seeds a fresh
 database, runs the real Wonder matching agent over eval/matching_cases.json,
 and writes docs/eval/matching.md. Never run by pytest. Needs META_API_KEY,
-META_MODEL_AGENT and SEED_DEMO_PASSWORD in .env. A full run is 30 Wonder
+META_MODEL_AGENT and SEED_DEMO_PASSWORD in .env. A full run is 40 Wonder
 calls; start with --limit 3.
 """
 from __future__ import annotations

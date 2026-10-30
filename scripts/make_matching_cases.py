@@ -1,4 +1,4 @@
-"""Generate 30 deterministic matching-eval cases from the seed specs.
+"""Generate 40 deterministic matching-eval cases from the seed specs.
 
 Run from the project root: ``python -m scripts.make_matching_cases``.
 Writes ``eval/matching_cases.json``. Professor ids are the deterministic
@@ -19,6 +19,17 @@ DEPT_CATEGORY = {
     "Computer Science": "data",
     "Economics": "methodology",
     "English Literature": "writing",
+    "Biology": "data",
+    "Chemistry": "methodology",
+    "Physics": "data",
+    "Mathematics": "statistics",
+    "Civil Engineering": "methodology",
+    "Electrical Engineering": "data",
+    "Law": "literature",
+    "Education": "theory",
+    "Psychology": "statistics",
+    "Business Administration": "methodology",
+    "Agricultural Science": "data",
 }
 
 
@@ -48,8 +59,9 @@ def _diagnosis(
 
 
 def build_cases() -> list[dict[str, object]]:
-    """20 single-specialty cases plus 10 cross-specialty mixes."""
+    """One single-specialty case per spec plus 5 cross-specialty mixes."""
     cases: list[dict[str, object]] = []
+    total = len(PROFESSOR_SPECS)
     for index, (dept, areas, blurb) in enumerate(PROFESSOR_SPECS, 1):
         category = DEPT_CATEGORY[dept]
         cases.append(
@@ -61,11 +73,11 @@ def build_cases() -> list[dict[str, object]]:
                 "acceptable_ids": [index],
             }
         )
-    for mix in range(10):
-        first = (mix * 3) % 20
-        second = (mix * 7 + 5) % 20
+    for mix in range(5):
+        first = (mix * 7) % total
+        second = (mix * 11 + 13) % total
         if second == first:
-            second = (second + 1) % 20
+            second = (second + 1) % total
         spec_a, spec_b = PROFESSOR_SPECS[first], PROFESSOR_SPECS[second]
         keywords = list(spec_a[1]) + list(spec_b[1])
         cases.append(

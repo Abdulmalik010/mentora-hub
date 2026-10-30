@@ -98,14 +98,14 @@ app/
     messaging.py     per-booking threads, rate limits, read state
     transcription.py stub (Muse Voice Transcribe)
     pdf_service.py   stub (library TBD)
-scripts/seed.py      idempotent synthetic seed (20 profs / 4 depts / 3 students)
+scripts/seed.py      idempotent synthetic seed (35 profs / 15 depts / 3 students)
 scripts/check_meta.py live Meta API smoke test (never run by pytest)
 scripts/make_samples.py regenerates samples/ fixtures
 scripts/make_matching_cases.py regenerates eval/matching_cases.json
 scripts/eval_diagnosis.py live diagnosis eval (never run by pytest)
 scripts/eval_matching.py live matching eval (never run by pytest)
 samples/             synthetic thesis excerpts + expected.json (demo fixtures)
-eval/                30 generated matching-eval cases
+eval/                40 generated matching-eval cases
 docs/eval/           eval reports (written by the eval scripts)
 tests/               pytest suite (smoke, auth, intake, parallel, matching,
                      booking, email, workflow, notifications, professor,
@@ -168,11 +168,11 @@ python -m scripts.make_matching_cases   # regenerate eval/matching_cases.json
 
 `eval_diagnosis` compares found gaps with `samples/expected.json` over
 repeated runs (planted-flaw recall, grounding rate, latency, tokens) and
-writes `docs/eval/diagnosis.md`. `eval_matching` runs the 30 generated cases
+writes `docs/eval/diagnosis.md`. `eval_matching` runs the 40 generated cases
 (top-1/top-3 accuracy, latency, tokens) and writes `docs/eval/matching.md`.
 Both need `META_API_KEY` plus the `META_MODEL_*` ids in `.env`;
 `eval_matching` also needs `SEED_DEMO_PASSWORD`. Start matching with
-`--limit 3`: a full run is 30 Wonder calls.
+`--limit 3`: a full run is 40 Wonder calls.
 
 ## Design credits
 

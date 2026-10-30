@@ -4,15 +4,9 @@ from flask import Blueprint, abort, render_template, request
 from ..extensions import db
 from ..models import ProfessorProfile, User
 from ..services.matching import search_professors
+from ..services.profiles import department_choices
 
 bp = Blueprint("professors", __name__)
-
-DEPARTMENTS = (
-    "Statistics",
-    "Computer Science",
-    "Economics",
-    "English Literature",
-)
 
 
 @bp.get("/health")
@@ -26,7 +20,8 @@ def index() -> str:
     """Public directory with keyword search and department filter."""
     query = request.args.get("q", "").strip()
     department = request.args.get("department", "").strip() or None
-    if department not in DEPARTMENTS:
+    choices = department_choices()
+    if department not in choices:
         department = None
     keywords = [query] if query else []
     results = search_professors(keywords, department, limit=50)
@@ -35,7 +30,7 @@ def index() -> str:
         results=results,
         query=query,
         department=department,
-        departments=DEPARTMENTS,
+        departments=choices,
     )
 
 

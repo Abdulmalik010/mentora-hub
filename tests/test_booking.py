@@ -265,7 +265,7 @@ def test_book_post_full_flow(app: Flask) -> None:
     assert "Cancel request" in detail_html
     listing = client.get("/sessions")
     assert listing.status_code == 200
-    assert "Dr. Chiamaka Obi" in listing.get_data(as_text=True)
+    assert "Dr. Lars Johansson" in listing.get_data(as_text=True)
 
 
 def test_book_post_requires_consent_and_valid_slot(app: Flask) -> None:

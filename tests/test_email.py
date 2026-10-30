@@ -275,7 +275,7 @@ def test_confirmation_content(app: Flask) -> None:
         booking=booking, professor=professor, student=student
     )
     assert email.to == student.email
-    assert "Dr. Chiamaka Obi" in email.text
+    assert "Dr. Lars Johansson" in email.text
     assert "Wed, Nov 4 · 10:00 WAT" in email.text
     assert (booking.meeting_url or "") in email.text
     assert (booking.mock_payment_ref or "") in email.text

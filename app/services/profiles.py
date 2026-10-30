@@ -10,6 +10,8 @@ from __future__ import annotations
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy.exc import OperationalError
+
 from ..extensions import db
 from ..models import ProfessorProfile, StudentProfile, User
 from .slots import WEEKDAYS, validate_availability
@@ -28,19 +30,38 @@ FALLBACK_DEPARTMENTS = (
     "Computer Science",
     "Economics",
     "English Literature",
+    "Biology",
+    "Chemistry",
+    "Physics",
+    "Mathematics",
+    "Civil Engineering",
+    "Electrical Engineering",
+    "Law",
+    "Education",
+    "Psychology",
+    "Business Administration",
+    "Agricultural Science",
 )
 MAX_AREAS = 8
 MAX_BIO_CHARS = 2000
 
 
 def department_choices() -> list[str]:
-    """Distinct departments in the DB, or the canonical four when empty."""
-    rows = (
-        db.session.query(ProfessorProfile.department)
-        .distinct()
-        .order_by(ProfessorProfile.department)
-        .all()
-    )
+    """Distinct departments in the DB, or the canonical list when empty.
+
+    Falls back when the table is empty or missing (pre-seed database), so
+    registration and directory pages never 500 before the first seed.
+    """
+    try:
+        rows = (
+            db.session.query(ProfessorProfile.department)
+            .distinct()
+            .order_by(ProfessorProfile.department)
+            .all()
+        )
+    except OperationalError:
+        db.session.rollback()
+        return list(FALLBACK_DEPARTMENTS)
     names = sorted({row[0] for row in rows if row[0]})
     return names or list(FALLBACK_DEPARTMENTS)
 

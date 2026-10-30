@@ -97,3 +97,6 @@
 - 2026-10-30: Professor registration creates a bare profile and redirects to /profile/setup; self-registered professors (is_sample=False) show a "Self-registered" badge and "(demo)" pricing instead of sample labels.
 - 2026-10-30: Student cancels and proposal answers now notify the professor in-app (cancelled/proposal_accepted/proposal_declined); only the cancel action emails the professor (booking_cancelled_professor) — proposal answers stay email-silent.
 - 2026-10-30: Part E needs no fresh dev DB (no schema change); .gitignore covers uploads/ and samples/audio/.
+- 2026-10-30: Step 4.3 Part A: seed is 35 professors across 15 departments (4 kept at 2-3 each plus the 11 named additions = 15, read as "about 14"); no political science or clinical medicine; existing dev DBs refresh convergently by sample email.
+- 2026-10-30: Department lists are DB-driven everywhere: tool schemas built per call via matching_tools(), registration/directory/editor validate against department_choices(), which falls back to the canonical 15 pre-seed or on a missing table.
+- 2026-10-30: Eval cases are 40 (one per spec plus 5 deterministic mixes) covering all 15 departments; seed area strings double as retrieval keys and must stay unique substrings.

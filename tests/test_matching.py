@@ -13,6 +13,7 @@ from app.services.matching import (
     check_availability,
     coerce_ranking,
     get_professor_profile,
+    matching_tools,
     only_order_errors,
     run_matching,
     search_professors,
@@ -125,10 +126,88 @@ def test_search_professors_ranks_by_keyword(app: Flask) -> None:
     """Econometrics query ranks the econometrics professor first."""
     seed_database()
     hits = search_professors(["econometrics"])
-    assert hits[0]["professor_id"] == 12
+    assert hits[0]["professor_id"] == 8
     assert hits[0]["score"] > hits[-1]["score"]
     dept = search_professors(["writing"], department="English Literature")
     assert dept and all(hit["department"] == "English Literature" for hit in dept)
+
+
+def test_matching_tools_list_db_departments(app: Flask) -> None:
+    """The search-tool filter names live DB departments, never a stale list."""
+    from app.models import ProfessorProfile
+
+    seed_database()
+    tools = matching_tools()
+    description = tools[0]["function"]["parameters"]["properties"][
+        "department"
+    ]["description"]
+    assert "Agricultural Science" in description
+    assert "Statistics" in description
+    user = User(display_name="Dr. Xeno Guest", email="xeno@example.com",
+                role="professor")
+    user.set_password("password-123")
+    db.session.add(user)
+    db.session.flush()
+    db.session.add(
+        ProfessorProfile(
+            user_id=user.id, department="Xenolinguistics",
+            research_areas=[], bio="", availability={},
+        )
+    )
+    db.session.commit()
+    fresh = matching_tools()[0]["function"]["parameters"]["properties"][
+        "department"
+    ]["description"]
+    assert "Xenolinguistics" in fresh
+
+
+def test_register_accepts_seed_departments(app: Flask) -> None:
+    """Registration admits every seeded department and rejects unknown ones."""
+    seed_database()
+    client = app.test_client()
+    good = client.post(
+        "/auth/register",
+        data={
+            "display_name": "New Physicist",
+            "email": "physicist@example.com",
+            "password": "password-123",
+            "role": "professor",
+            "department": "Physics",
+        },
+    )
+    assert good.status_code in (302, 303)
+    bad = client.post(
+        "/auth/register",
+        data={
+            "display_name": "Atlantis Scholar",
+            "email": "atlantis@example.com",
+            "password": "password-123",
+            "role": "professor",
+            "department": "Atlantis Studies",
+        },
+    )
+    assert bad.status_code == 400
+
+
+def test_matching_eval_cases_cover_seed(app: Flask) -> None:
+    """The committed 40 eval cases resolve against the 35 seeded professors."""
+    from pathlib import Path
+
+    from scripts.seed import PROFESSOR_SPECS
+
+    seed_database()
+    path = Path(app.root_path).parent / "eval" / "matching_cases.json"
+    cases = json.loads(path.read_text(encoding="utf-8"))
+    assert len(cases) == 40
+    total = len(PROFESSOR_SPECS)
+    seen: set[int] = set()
+    for case in cases:
+        for pid in case["acceptable_ids"]:
+            assert 1 <= pid <= total
+            seen.add(pid)
+    assert seen == set(range(1, total + 1))
+    fields = {case["diagnosis"]["field"] for case in cases}
+    assert {"Physics", "Law", "Agricultural Science"} <= fields
 
 
 def test_tool_search_clamps_limit_to_five(app: Flask) -> None:
@@ -145,7 +224,7 @@ def test_tool_search_clamps_limit_to_five(app: Flask) -> None:
 def test_profile_and_availability_tools(app: Flask) -> None:
     """Profile returns full rows; availability computes real future dates."""
     seed_database()
-    profile = get_professor_profile(12)
+    profile = get_professor_profile(8)
     assert profile["department"] == "Economics"
     assert get_professor_profile(999) == {"error": "unknown professor_id: 999"}
     slots = check_availability(1, 14)
@@ -237,8 +316,8 @@ def test_summarize_tool_call(app: Flask) -> None:
     assert label.startswith("Searched all departments for 'econometrics'")
     assert "Dr. Chiamaka Obi" in label
     profile_label = summarize_tool_call(
-        "get_professor_profile", {"professor_id": 12},
-        json.dumps(get_professor_profile(12)),
+        "get_professor_profile", {"professor_id": 8},
+        json.dumps(get_professor_profile(8)),
     )
     assert profile_label == (
         "Checked profile: Dr. Chiamaka Obi, Economics: "
@@ -332,19 +411,19 @@ def test_professors_directory_is_public(app: Flask) -> None:
     assert filtered.status_code == 200
     assert b"Dr. Chiamaka Obi" in filtered.data
     assert b"Prof. Adaeze Nwosu" not in filtered.data
-    assert "\u20a622,000" in filtered.get_data(as_text=True)
+    assert "\u20a618,000" in filtered.get_data(as_text=True)
 
 
 def test_professor_detail_and_404(app: Flask) -> None:
     """Detail renders the profile; unknown ids 404."""
     seed_database()
     client = app.test_client()
-    page = client.get("/professors/12")
+    page = client.get("/professors/8")
     assert page.status_code == 200
     assert b"Econometrics" in page.data and b"Sample profile" in page.data
-    assert b"Dr. Chiamaka Obi" in page.data
+    assert b"Dr. Chiamaka Obi" in page.data  # /professors/8
     assert b"Senior Lecturer" in page.data
-    assert "\u20a622,000" in page.get_data(as_text=True)
+    assert "\u20a618,000" in page.get_data(as_text=True)
     assert client.get("/professors/999").status_code == 404
 
 

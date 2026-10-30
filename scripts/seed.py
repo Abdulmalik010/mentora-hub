@@ -1,4 +1,4 @@
-"""Idempotent development seed: 20 synthetic professors, 3 students.
+"""Idempotent development seed: 35 synthetic professors, 3 students.
 
 Run from the project root: ``python -m scripts.seed`` (requires the
 ``SEED_DEMO_PASSWORD`` env var). Creates tables when missing. Every record
@@ -28,11 +28,26 @@ DEPARTMENTS: tuple[str, ...] = (
     "Computer Science",
     "Economics",
     "English Literature",
+    "Biology",
+    "Chemistry",
+    "Physics",
+    "Mathematics",
+    "Civil Engineering",
+    "Electrical Engineering",
+    "Law",
+    "Education",
+    "Psychology",
+    "Business Administration",
+    "Agricultural Science",
 )
 
 # Importable spec: (department, research areas, specialty blurb). Order is the
-# deterministic seed order, so a fresh database assigns professor ids 1..20;
+# deterministic seed order, so a fresh database assigns professor ids 1..35;
 # scripts/make_matching_cases.py derives eval expectations from this table.
+# 15 departments ("about 14" per the brief: the 4 originals plus the 11 named
+# additions), 2-3 professors each. Deliberately no political science or
+# clinical medicine. Area strings are retrieval keys: each spec's own areas
+# must not appear as substrings in any other spec's areas or blurb.
 PROFESSOR_SPECS: tuple[tuple[str, list[str], str], ...] = (
     ("Statistics", ["Bayesian inference", "Clinical trials"],
      "Advises on Bayesian methods and clinical trial design."),
@@ -40,40 +55,70 @@ PROFESSOR_SPECS: tuple[tuple[str, list[str], str], ...] = (
      "Advises on survey design and official statistics."),
     ("Statistics", ["Time series", "Forecasting"],
      "Advises on time series modelling and forecasting."),
-    ("Statistics", ["Experimental design", "Causal inference"],
-     "Advises on experiments and causal inference."),
-    ("Statistics", ["Multivariate analysis", "Psychometrics"],
-     "Advises on multivariate methods and psychometrics."),
     ("Computer Science", ["Machine learning", "Natural language processing"],
      "Advises on machine learning and language models."),
     ("Computer Science", ["Databases", "Data engineering"],
      "Advises on databases and data pipelines."),
     ("Computer Science", ["Algorithms", "Optimization"],
      "Advises on algorithms and optimization."),
-    ("Computer Science", ["Software engineering", "Programming languages"],
-     "Advises on software design and programming languages."),
-    ("Computer Science", ["Computer vision", "Image analysis"],
-     "Advises on computer vision and image analysis."),
     ("Economics", ["Development economics", "Poverty measurement"],
      "Advises on development and poverty measurement."),
     ("Economics", ["Econometrics", "Policy evaluation"],
      "Advises on econometrics and policy evaluation."),
     ("Economics", ["Labour markets", "Education economics"],
      "Advises on labour markets and education economics."),
-    ("Economics", ["Monetary economics", "Financial markets"],
-     "Advises on monetary economics and financial markets."),
-    ("Economics", ["Behavioral economics", "Experimental economics"],
-     "Advises on behavioral and experimental economics."),
     ("English Literature", ["African literature", "Postcolonial theory"],
      "Advises on African literature and postcolonial theory."),
     ("English Literature", ["Academic writing", "Rhetoric"],
      "Advises on academic writing and rhetoric."),
-    ("English Literature", ["Literary theory", "Narratology"],
-     "Advises on literary theory and narrative analysis."),
-    ("English Literature", ["Stylistics", "Discourse analysis"],
-     "Advises on stylistics and discourse analysis."),
-    ("English Literature", ["Comparative literature", "Translation studies"],
-     "Advises on comparative literature and translation."),
+    ("Biology", ["Genetics", "Molecular biology"],
+     "Advises on genetics and molecular biology."),
+    ("Biology", ["Ecology", "Biodiversity conservation"],
+     "Advises on ecology and biodiversity conservation."),
+    ("Biology", ["Microbiology", "Plant physiology"],
+     "Advises on microbiology and plant physiology."),
+    ("Chemistry", ["Organic chemistry", "Chemical synthesis"],
+     "Advises on organic chemistry and chemical synthesis."),
+    ("Chemistry", ["Analytical chemistry", "Spectroscopy"],
+     "Advises on analytical chemistry and spectroscopy."),
+    ("Physics", ["Astrophysics", "Cosmology"],
+     "Advises on astrophysics and cosmology."),
+    ("Physics", ["Condensed matter", "Materials physics"],
+     "Advises on condensed matter and materials physics."),
+    ("Mathematics", ["Pure mathematics", "Number theory"],
+     "Advises on pure mathematics and number theory."),
+    ("Mathematics", ["Numerical analysis", "Scientific computing"],
+     "Advises on numerical analysis and scientific computing."),
+    ("Mathematics", ["Operations research", "Probability theory"],
+     "Advises on operations research and probability theory."),
+    ("Civil Engineering", ["Structural engineering", "Construction materials"],
+     "Advises on structural engineering and construction materials."),
+    ("Civil Engineering", ["Water resources", "Hydrology"],
+     "Advises on water resources and hydrology."),
+    ("Electrical Engineering", ["Power systems", "Renewable energy"],
+     "Advises on power systems and renewable energy."),
+    ("Electrical Engineering", ["Signal processing", "Control systems"],
+     "Advises on signal processing and control systems."),
+    ("Law", ["Constitutional law", "Human rights law"],
+     "Advises on constitutional law and human rights law."),
+    ("Law", ["Commercial law", "Contract law"],
+     "Advises on commercial law and contract law."),
+    ("Education", ["Curriculum studies", "Instructional design"],
+     "Advises on curriculum studies and instructional design."),
+    ("Education", ["Educational assessment", "Learning analytics"],
+     "Advises on educational assessment and learning analytics."),
+    ("Psychology", ["Cognitive psychology", "Behavioral neuroscience"],
+     "Advises on cognitive psychology and behavioral neuroscience."),
+    ("Psychology", ["Developmental psychology", "Educational psychology"],
+     "Advises on developmental and educational psychology."),
+    ("Business Administration", ["Financial management", "Corporate finance"],
+     "Advises on financial management and corporate finance."),
+    ("Business Administration", ["Marketing", "Consumer behavior"],
+     "Advises on marketing and consumer behavior."),
+    ("Agricultural Science", ["Crop science", "Soil fertility"],
+     "Advises on crop science and soil fertility."),
+    ("Agricultural Science", ["Agricultural economics", "Farm management"],
+     "Advises on agricultural economics and farm management."),
 )
 
 STUDENT_LEVELS: tuple[str, ...] = ("undergraduate", "masters", "phd")
@@ -92,23 +137,38 @@ PROFESSOR_NAMES: tuple[tuple[str, str, str, str], ...] = (
     ("Adaeze", "Nwosu", "Prof.", "Professor"),
     ("Tunde", "Alabi", "Dr.", "Senior Lecturer"),
     ("Yuki", "Tanaka", "Dr.", "Associate Professor"),
-    ("Lars", "Johansson", "Dr.", "Senior Lecturer"),
-    ("Priya", "Sharma", "Prof.", "Professor"),
     ("Olumide", "Adeyemi", "Dr.", "Associate Professor"),
     ("James", "Whitfield", "Dr.", "Senior Lecturer"),
     ("Chen", "Wei", "Prof.", "Professor"),
-    ("Sofia", "Rossi", "Dr.", "Lecturer I"),
-    ("Kwame", "Mensah", "Dr.", "Senior Lecturer"),
     ("Aisha", "Bello", "Prof.", "Professor"),
     ("Chiamaka", "Obi", "Dr.", "Senior Lecturer"),
     ("Diego", "Fernandez", "Dr.", "Associate Professor"),
-    ("Ngozi", "Eze", "Dr.", "Lecturer I"),
-    ("Anna", "Kowalski", "Dr.", "Associate Professor"),
     ("Zanele", "Dlamini", "Dr.", "Senior Lecturer"),
     ("Maria", "Santos", "Prof.", "Professor"),
+    ("Lars", "Johansson", "Dr.", "Senior Lecturer"),
+    ("Funke", "Adewale", "Dr.", "Senior Lecturer"),
+    ("Priya", "Sharma", "Prof.", "Professor"),
+    ("Ibrahim", "Musa", "Prof.", "Professor"),
+    ("Grace", "Okonkwo", "Dr.", "Lecturer I"),
+    ("Rajesh", "Iyer", "Dr.", "Associate Professor"),
+    ("Ingrid", "Larsen", "Dr.", "Senior Lecturer"),
+    ("Sofia", "Rossi", "Dr.", "Lecturer I"),
+    ("Carlos", "Mendez", "Dr.", "Senior Lecturer"),
+    ("Hauwa", "Garba", "Dr.", "Senior Lecturer"),
+    ("Kwame", "Mensah", "Dr.", "Senior Lecturer"),
+    ("Peter", "Novak", "Prof.", "Professor"),
+    ("Mei", "Lin", "Dr.", "Associate Professor"),
+    ("Ngozi", "Eze", "Dr.", "Lecturer I"),
+    ("Oliver", "Bennett", "Dr.", "Lecturer I"),
+    ("Anna", "Kowalski", "Dr.", "Associate Professor"),
+    ("Zainab", "Yusuf", "Dr.", "Senior Lecturer"),
     ("Emeka", "Diallo", "Dr.", "Lecturer I"),
+    ("Samuel", "Boateng", "Dr.", "Associate Professor"),
     ("Fatima", "Hassan", "Dr.", "Senior Lecturer"),
+    ("Elena", "Petrova", "Prof.", "Professor"),
+    ("Jae", "Park", "Dr.", "Lecturer I"),
     ("David", "Osei", "Dr.", "Lecturer I"),
+    ("Nadia", "Rahman", "Dr.", "Senior Lecturer"),
 )
 
 
@@ -124,7 +184,7 @@ def _get_or_create_user(email: str, **fields: object) -> tuple[User, bool]:
 
 
 def seed_database() -> dict[str, int]:
-    """Seed 20 professors and 3 students; safe to run repeatedly.
+    """Seed 35 professors and 3 students; safe to run repeatedly.
 
     Must run inside an app context. Existing sample rows (matched by email)
     are refreshed to the canonical spec values, so re-runs are convergent

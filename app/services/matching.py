@@ -49,76 +49,89 @@ MATCH_SYSTEM_PROMPT = (
     "End with a short shortlist summary naming professor ids."
 )
 
-TOOLS: list[dict[str, Any]] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "search_professors",
-            "description": (
-                "Keyword search over professor departments, research areas "
-                "and bios. Returns professor user ids with match scores."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "keywords": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Expertise keywords from the diagnosis.",
+def matching_tools() -> list[dict[str, Any]]:
+    """Tool schemas with the department filter drawn from the database.
+
+    Built per call (not a module constant) so self-registered departments
+    and seed changes reach the agent without a restart.
+    """
+    from .profiles import department_choices
+
+    departments = ", ".join(department_choices())
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "search_professors",
+                "description": (
+                    "Keyword search over professor departments, research "
+                    "areas and bios. Returns professor user ids with match "
+                    "scores."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "keywords": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Expertise keywords from the diagnosis."
+                            ),
+                        },
+                        "department": {
+                            "type": "string",
+                            "description": (
+                                "Optional department filter; one of: "
+                                f"{departments}."
+                            ),
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (1-5, default 5).",
+                        },
                     },
-                    "department": {
-                        "type": "string",
-                        "description": (
-                            "Optional department filter: Statistics, "
-                            "Computer Science, Economics or English "
-                            "Literature (mirrors the seed departments)."
-                        ),
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Max results (1-5, default 5).",
-                    },
+                    "required": ["keywords"],
+                    "additionalProperties": False,
                 },
-                "required": ["keywords"],
-                "additionalProperties": False,
             },
         },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_professor_profile",
-            "description": "Full profile for one professor user id.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "professor_id": {"type": "integer"},
-                },
-                "required": ["professor_id"],
-                "additionalProperties": False,
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "check_availability",
-            "description": "Upcoming open slots for one professor user id.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "professor_id": {"type": "integer"},
-                    "days": {
-                        "type": "integer",
-                        "description": "Look-ahead window in days (default 14).",
+        {
+            "type": "function",
+            "function": {
+                "name": "get_professor_profile",
+                "description": "Full profile for one professor user id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "professor_id": {"type": "integer"},
                     },
+                    "required": ["professor_id"],
+                    "additionalProperties": False,
                 },
-                "required": ["professor_id"],
-                "additionalProperties": False,
             },
         },
-    },
-]
+        {
+            "type": "function",
+            "function": {
+                "name": "check_availability",
+                "description": "Upcoming open slots for one professor user id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "professor_id": {"type": "integer"},
+                        "days": {
+                            "type": "integer",
+                            "description": (
+                                "Look-ahead window in days (default 14)."
+                            ),
+                        },
+                    },
+                    "required": ["professor_id"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+    ]
 
 RANKING_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -535,7 +548,7 @@ def run_matching(
                 {"role": "system", "content": MATCH_SYSTEM_PROMPT},
                 {"role": "user", "content": research},
             ],
-            TOOLS,
+            matching_tools(),
             build_tool_map(),
             model=model,
             log_tool_call=_bridge_tool_log(run_id, records),

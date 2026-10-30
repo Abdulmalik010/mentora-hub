@@ -5,16 +5,20 @@ import json
 from datetime import date
 from typing import Any
 
+import pytest
 from flask import Flask
 
 from app.extensions import db
 from app.models import CaseFile, MatchResult, RunEvent, ToolCallLog, User
 from app.services.matching import (
+    FAST_CANDIDATE_LIMIT,
     check_availability,
     coerce_ranking,
+    first_open_slot,
     get_professor_profile,
     matching_tools,
     only_order_errors,
+    retrieve_candidates,
     run_matching,
     search_professors,
     summarize_tool_call,
@@ -293,7 +297,7 @@ def test_matching_sorts_and_flags_unordered_scores(app: Flask) -> None:
     outcome = run_matching(
         case, "run-match-1",
         FakeMatchClient([unordered_ranking(), unordered_ranking()]),
-        model="fake-match", effort=None,
+        model="fake-match", effort=None, mode="agentic",
     )
     assert [row.score for row in outcome.matches] == [90, 85, 80]
     assert [row.professor_id for row in outcome.matches] == [2, 1, 12]
@@ -346,7 +350,7 @@ def test_run_matching_persists_and_logs(app: Flask) -> None:
     case = seed_match_case()
     outcome = run_matching(
         case, "run-match-1", FakeMatchClient([make_ranking(12, 2, 1)]),
-        model="fake-match", effort=None,
+        model="fake-match", effort=None, mode="agentic",
     )
     assert [row.rank for row in outcome.matches] == [1, 2, 3]
     assert outcome.matches[0].professor_id == 12
@@ -376,7 +380,7 @@ def test_matching_retries_once_then_persists(app: Flask) -> None:
     run_matching(
         case, "run-match-1",
         FakeMatchClient([make_ranking(999, 2, 1), make_ranking(12, 2, 1)]),
-        model="fake-match", effort=None,
+        model="fake-match", effort=None, mode="agentic",
     )
     assert RunEvent.query.filter_by(
         run_id="run-match-1", type="matching_retry"
@@ -393,7 +397,7 @@ def test_matching_twice_invalid_raises(app: Flask) -> None:
         run_matching(
             case, "run-match-1",
             FakeMatchClient([make_ranking(999, 2, 1), make_ranking(998, 2, 1)]),
-            model="fake-match", effort=None,
+            model="fake-match", effort=None, mode="agentic",
         )
     assert MatchResult.query.filter_by(case_id=case.id).count() == 0
 
@@ -493,8 +497,140 @@ def test_full_pipeline_includes_matching(app: Flask, tmp_path) -> None:  # type:
     assert types.index("grounding_checked") < types.index("matching_started")
 
 
+class RecordingFake(FakeMatchClient):
+    """FakeMatchClient that records the model/effort of ranking calls."""
+
+    def __init__(self, rankings: list[dict[str, Any]]) -> None:
+        super().__init__(rankings)
+        self.rank_models: list[str] = []
+        self.rank_efforts: list[str | None] = []
+
+    def chat(
+        self,
+        messages: list[dict[str, Any]],
+        tools: Any = None,
+        *,
+        model: str,
+        response_format: dict[str, Any] | None = None,
+        effort: str | None = None,
+    ) -> ChatResult:
+        """Record ranking-call routing, then serve the canned payload."""
+        if response_format is not None:
+            self.rank_models.append(model)
+            self.rank_efforts.append(effort)
+        return super().chat(
+            messages, tools, model=model,
+            response_format=response_format, effort=effort,
+        )
+
+
+def test_retrieve_candidates_field_boost(app: Flask) -> None:
+    """Same-field hits outrank equal keyword scores; limit holds."""
+    seed_database()
+    boosted = retrieve_candidates(["economics"], "Agricultural Science")
+    assert len(boosted) == FAST_CANDIDATE_LIMIT
+    assert boosted[0]["professor_id"] == 35
+    plain = retrieve_candidates(["economics"])
+    assert plain[0]["professor_id"] == 9  # areas + dept + bio mention
+    assert retrieve_candidates(["econometrics"])[0]["professor_id"] == 8
+
+
+def test_retrieve_candidates_respects_opt_out(app: Flask) -> None:
+    """Professors who stopped accepting requests never surface."""
+    from app.models import ProfessorProfile
+
+    seed_database()
+    profile = ProfessorProfile.query.filter_by(user_id=8).one()
+    profile.accepting_new = False
+    db.session.commit()
+    ids = [hit["professor_id"] for hit in retrieve_candidates(["econometrics"])]
+    assert 8 not in ids
+
+
+def test_fast_matching_persists_with_code_slots(app: Flask) -> None:
+    """Fast default: one ranking call, code-computed slots, logged retrieval."""
+    from app.models import ProfessorProfile
+
+    case = seed_match_case()
+    outcome = run_matching(
+        case, "run-match-1", FakeMatchClient([make_ranking(12, 2, 1)]),
+        model="fake-match", effort=None,
+    )
+    assert [row.professor_id for row in outcome.matches] == [12, 2, 1]
+    for row in outcome.matches:
+        profile = ProfessorProfile.query.filter_by(user_id=row.professor_id).one()
+        assert row.next_slot == first_open_slot(profile)
+        assert row.next_slot != "2026-11-02 10:00 WAT"  # model string replaced
+    assert ToolCallLog.query.filter_by(
+        tool_name="get_professor_profile"
+    ).count() == FAST_CANDIDATE_LIMIT
+    types = [
+        event.type
+        for event in RunEvent.query.filter_by(run_id="run-match-1")
+        .order_by(RunEvent.seq).all()
+    ]
+    assert "slots_computed" in types
+    assert types.count("tool_call") == 1 + FAST_CANDIDATE_LIMIT
+
+
+def test_match_mode_switch(app: Flask) -> None:
+    """Unknown modes fail fast; agentic keeps model-provided slots."""
+    case = seed_match_case()
+    with pytest.raises(ValueError, match="MATCH_MODE"):
+        run_matching(
+            case, "run-match-1", FakeMatchClient([make_ranking(12, 2, 1)]),
+            model="fake-match", effort=None, mode="turbo",
+        )
+    outcome = run_matching(
+        case, "run-match-1", FakeMatchClient([make_ranking(12, 2, 1)]),
+        model="fake-match", effort=None, mode="agentic",
+    )
+    assert outcome.matches[0].next_slot == "2026-11-02 10:00 WAT"
+    assert RunEvent.query.filter_by(
+        run_id="run-match-1", type="slots_computed"
+    ).count() == 0
+
+
+def test_fast_rank_model_selection(app: Flask) -> None:
+    """Explicit rank model/effort reach the ranking call; else the default."""
+    case = seed_match_case()
+    fake = RecordingFake([make_ranking(12, 2, 1)])
+    run_matching(
+        case, "run-match-1", fake, model="fake-match", effort=None,
+        rank_model="spark-x", rank_effort="low",
+    )
+    assert fake.rank_models == ["spark-x"]
+    assert fake.rank_efforts == ["low"]
+    fallback = RecordingFake([make_ranking(12, 2, 1)])
+    run_matching(
+        case, "run-match-2", fallback, model="fake-match", effort=None,
+    )
+    assert fallback.rank_models == ["fake-match"]
+
+
+def test_matching_phase_resolves_rank_from_env(app: Flask, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Spark rank choice routes the ranking call to META_MODEL_FAST."""
+    from app.services.diagnosis import _run_matching_phase
+
+    case = seed_match_case()
+    monkeypatch.setenv("META_API_KEY", "test-dummy-key")
+    monkeypatch.setenv("META_MODEL_AGENT", "wonder-x")
+    monkeypatch.setenv("META_MODEL_FAST", "spark-x")
+    monkeypatch.setenv("META_EFFORT_FAST", "low")
+    monkeypatch.delenv("META_EFFORT_AGENT", raising=False)
+    app.config["MATCH_MODE"] = "fast"
+    app.config["MATCH_RANK_MODEL"] = "spark"
+    fake = RecordingFake([make_ranking(12, 2, 1)])
+    _run_matching_phase(app, case, "run-match-1", fake, None, None)
+    assert fake.rank_models == ["spark-x"]
+    assert fake.rank_efforts == ["low"]
+    app.config["MATCH_MODE"] = "bogus"
+    with pytest.raises(ValueError, match="MATCH_MODE"):
+        _run_matching_phase(app, case, "run-match-2", fake, "fake", None)
+
+
 def test_matching_degrades_on_tool_budget(app: Flask) -> None:
-    """A sweeping agent is capped at 12 calls; ranking uses the findings."""
+    """A sweeping agent is capped at 3 turns; ranking uses the findings."""
     case = seed_match_case()
 
     class SweepingFake(FakeMatchClient):
@@ -518,16 +654,16 @@ def test_matching_degrades_on_tool_budget(app: Flask) -> None:
 
     run_matching(
         case, "run-match-1", SweepingFake([make_ranking(12, 2, 1)]),
-        model="fake-match", effort=None,
+        model="fake-match", effort=None, mode="agentic",
     )
     assert MatchResult.query.filter_by(case_id=case.id).count() == 3
     assert RunEvent.query.filter_by(
         run_id="run-match-1", type="tool_call"
-    ).count() == 12
+    ).count() == 6  # 3 turns x 2 batched calls
     exhausted = RunEvent.query.filter_by(
         run_id="run-match-1", type="tool_budget_exhausted"
     ).one()
-    assert "12 findings" in exhausted.label
+    assert "6 findings" in exhausted.label
 
 
 def test_student_case_routes_still_guarded(app: Flask) -> None:

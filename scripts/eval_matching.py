@@ -1,10 +1,11 @@
 """Live matching eval: top-1/top-3 accuracy, latency, tokens.
 
-Usage: ``python -m scripts.eval_matching [--limit N]``. Seeds a fresh
-database, runs the real Wonder matching agent over eval/matching_cases.json,
-and writes docs/eval/matching.md. Never run by pytest. Needs META_API_KEY,
-META_MODEL_AGENT and SEED_DEMO_PASSWORD in .env. A full run is 40 Wonder
-calls; start with --limit 3.
+Usage: ``python -m scripts.eval_matching [--limit N] [--mode fast|agentic]
+[--rank-model spark|wonder]``. Seeds a fresh database, runs live matching
+over eval/matching_cases.json, and writes docs/eval/matching.md. Never run
+by pytest. Needs META_API_KEY, META_MODEL_AGENT, META_MODEL_FAST and
+SEED_DEMO_PASSWORD in .env. A full run is 40 agent calls; start with
+--limit 3. Compare rank models on 10 cases before changing the default.
 """
 from __future__ import annotations
 
@@ -48,6 +49,14 @@ def main(argv: list[str] | None = None) -> int:
     load_dotenv(ROOT / ".env")
     parser = argparse.ArgumentParser(description="Live matching eval.")
     parser.add_argument("--limit", type=int, default=0, help="0 = all cases")
+    parser.add_argument(
+        "--mode", choices=("fast", "agentic"), default="fast",
+        help="matching architecture under test",
+    )
+    parser.add_argument(
+        "--rank-model", choices=("spark", "wonder"), default="spark",
+        help="fast-mode ranking model (META_MODEL_FAST vs META_MODEL_AGENT)",
+    )
     args = parser.parse_args(argv)
     if not os.environ.get("SEED_DEMO_PASSWORD"):
         print("SEED_DEMO_PASSWORD must be set (eval seeds a fresh database)")
@@ -55,7 +64,10 @@ def main(argv: list[str] | None = None) -> int:
     cases = json.loads((ROOT / "eval" / "matching_cases.json").read_text(encoding="utf-8"))
     if args.limit > 0:
         cases = cases[: args.limit]
-    print(f"matching eval: {len(cases)} live Wonder runs (this takes a while)")
+    print(
+        f"matching eval: {len(cases)} live runs "
+        f"(mode={args.mode}, rank={args.rank_model}; this takes a while)"
+    )
 
     tmp = tempfile.mkdtemp(prefix="mentora-evalmatch-")
     app = create_app(
@@ -77,6 +89,13 @@ def main(argv: list[str] | None = None) -> int:
         client = OpenAICompatChatClient(settings)
         model = settings.model_agent
         effort = settings.effort_agent
+        if args.rank_model == "spark":
+            rank_model, rank_effort = settings.model_fast, settings.effort_fast
+        else:
+            rank_model, rank_effort = settings.model_agent, settings.effort_agent
+        if not rank_model:
+            print("rank model requested has no META_MODEL_* id set")
+            return 1
         reps: list[MatchingRep] = []
         failed = 0
         for position, entry in enumerate(cases, 1):
@@ -94,7 +113,9 @@ def main(argv: list[str] | None = None) -> int:
             acceptable = set(entry["acceptable_ids"])
             try:
                 outcome = run_matching(
-                    case, case.run_id, client, model, effort  # type: ignore[arg-type]
+                    case, case.run_id, client, model, effort,  # type: ignore[arg-type]
+                    mode=args.mode, rank_model=rank_model,
+                    rank_effort=rank_effort,
                 )
                 ranked = [row.professor_id for row in outcome.matches]
                 reps.append(
@@ -120,7 +141,8 @@ def main(argv: list[str] | None = None) -> int:
     lines = [
         "# Matching eval",
         "",
-        f"Top-1/top-3 accuracy over {len(reps)} live Wonder runs.",
+        f"Top-1/top-3 accuracy over {len(reps)} live runs "
+        f"(mode={args.mode}, rank={args.rank_model}).",
         "",
         "| case | top-1 | top-3 | ranked ids | latency | tokens |",
         "| --- | --- | --- | --- | --- | --- |",

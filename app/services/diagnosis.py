@@ -343,7 +343,7 @@ def run_case_pipeline(
             else:
                 _run_pipeline(case, run_id, chat_client, model, effort)
             _run_matching_phase(
-                case, run_id, match_client, match_model, match_effort
+                app, case, run_id, match_client, match_model, match_effort
             )
             case.status = "done"
             db.session.commit()
@@ -354,6 +354,7 @@ def run_case_pipeline(
 
 
 def _run_matching_phase(
+    app: Flask,
     case: CaseFile,
     run_id: str,
     match_client: ChatClient | None,
@@ -364,6 +365,16 @@ def _run_matching_phase(
     # Local import: matching.py depends on diagnosis helpers (one direction).
     from .matching import MATCH_MAX_ATTEMPTS, MATCH_TIMEOUT_S, run_matching
 
+    mode = app.config.get("MATCH_MODE") or "fast"
+    if mode not in ("fast", "agentic"):
+        raise ValueError(f"MATCH_MODE must be fast|agentic (got {mode!r})")
+    rank_choice = app.config.get("MATCH_RANK_MODEL") or "spark"
+    if rank_choice not in ("spark", "wonder"):
+        raise ValueError(
+            f"MATCH_RANK_MODEL must be spark|wonder (got {rank_choice!r})"
+        )
+    rank_model: str | None = None
+    rank_effort: str | None = None
     if match_client is None or match_model is None:
         settings = MetaSettings.from_env()
         settings = replace(
@@ -373,13 +384,25 @@ def _run_matching_phase(
         match_model = match_model or settings.model_agent
         if match_effort is None:
             match_effort = settings.effort_agent
+        if rank_choice == "spark":
+            rank_model, rank_effort = settings.model_fast, settings.effort_fast
+        else:
+            rank_model, rank_effort = settings.model_agent, settings.effort_agent
+        if not rank_model:
+            raise ValueError(
+                "fast ranking needs META_MODEL_FAST (spark) or "
+                "META_MODEL_AGENT (wonder) set"
+            )
     document = (
         db.session.get(Document, case.document_id) if case.document_id else None
     )
     source = ""
     if document is not None:
         source = document.extracted_text or ""
-    run_matching(case, run_id, match_client, match_model, match_effort, source)
+    run_matching(
+        case, run_id, match_client, match_model, match_effort, source,
+        mode=mode, rank_model=rank_model, rank_effort=rank_effort,
+    )
 
 
 @dataclass(frozen=True)

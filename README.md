@@ -162,7 +162,7 @@ Live scripts (real Meta calls, real credit; never run by pytest):
 
 ```powershell
 python -m scripts.eval_diagnosis [--mode both|parallel|single] [--reps 3]
-python -m scripts.eval_matching [--limit N]
+python -m scripts.eval_matching [--limit N] [--mode fast|agentic] [--rank-model spark|wonder]
 python -m scripts.make_matching_cases   # regenerate eval/matching_cases.json
 ```
 
@@ -172,7 +172,9 @@ writes `docs/eval/diagnosis.md`. `eval_matching` runs the 40 generated cases
 (top-1/top-3 accuracy, latency, tokens) and writes `docs/eval/matching.md`.
 Both need `META_API_KEY` plus the `META_MODEL_*` ids in `.env`;
 `eval_matching` also needs `SEED_DEMO_PASSWORD`. Start matching with
-`--limit 3`: a full run is 40 Wonder calls.
+`--limit 3`: a full run is 40 agent calls. Before changing the rank-model
+default, compare quality on 10 cases:
+`eval_matching --rank-model spark --limit 10` vs `--rank-model wonder`.
 
 ## Design credits
 

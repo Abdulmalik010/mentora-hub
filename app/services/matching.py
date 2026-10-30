@@ -16,7 +16,7 @@ from typing import Any
 from .diagnosis import json_dumps, log_event, normalize_text
 from ..extensions import db
 from ..models import CaseFile, MatchResult, ProfessorProfile, User
-from .slots import availability_windows
+from .slots import availability_windows, format_wat, generate_slots
 from .meta_client import (
     ChatClient,
     ChatResult,
@@ -27,10 +27,12 @@ from .meta_client import (
     run_tool_loop,
 )
 
-MATCH_MAX_ITERATIONS = 6
+MATCH_MAX_ITERATIONS = 3
 MATCH_MAX_TOOL_CALLS = 12
 MATCH_TIMEOUT_S = 180.0
 MATCH_MAX_ATTEMPTS = 5
+FAST_CANDIDATE_LIMIT = 8
+FIELD_BOOST = 4
 
 SCORE_ANCHORS = (
     "Score each professor 0-100 (integers, strictly descending: "
@@ -42,11 +44,12 @@ SCORE_ANCHORS = (
 
 MATCH_SYSTEM_PROMPT = (
     "You are Mentora's matching researcher. Find the best professors for a "
-    "student's diagnosed gaps using ONLY the provided tools. Work fast: run "
-    "at most 3 distinct searches, inspect at most 3 finalist profiles, check "
-    "availability for finalists only. Stop calling tools as soon as you have "
-    "3 strong candidates; do NOT sweep the whole directory. "
-    "End with a short shortlist summary naming professor ids."
+    "student's diagnosed gaps using ONLY the provided tools. You have at "
+    "most 3 turns: BATCH every independent tool call into a single turn "
+    "(one search plus several profile reads together), inspect at most 3 "
+    "finalist profiles, check availability for finalists only. Stop calling "
+    "tools as soon as you have 3 strong candidates; do NOT sweep the whole "
+    "directory. End with a short shortlist summary naming professor ids."
 )
 
 def matching_tools() -> list[dict[str, Any]]:
@@ -254,6 +257,35 @@ def check_availability(professor_id: int, days: int = 14) -> dict[str, Any]:
         if day.strftime("%A") in open_days:
             slots.append({"date": day.isoformat(), "hours": hours})
     return {"professor_id": professor_id, "hours": hours, "slots": slots}
+
+
+def retrieve_candidates(
+    keywords: list[str],
+    field: str | None = None,
+    limit: int = FAST_CANDIDATE_LIMIT,
+) -> list[dict[str, Any]]:
+    """Fast-path retrieval: keyword search plus a same-field boost.
+
+    Scores come from :func:`search_professors` (areas weigh most); hits in
+    the diagnosis field gain FIELD_BOOST so department fit breaks ties.
+    Deterministic; opt-outs stay excluded via the shared search.
+    """
+    hits = search_professors(keywords, limit=50)
+    if field:
+        wanted = field.strip().lower()
+        for hit in hits:
+            if str(hit.get("department", "")).lower() == wanted:
+                hit["score"] = int(hit.get("score", 0)) + FIELD_BOOST
+        hits.sort(key=lambda hit: (-hit["score"], hit["professor_id"]))
+    return hits[: max(1, limit)]
+
+
+def first_open_slot(profile: ProfessorProfile) -> str:
+    """Next bookable slot in code (``""`` when no pattern yields one)."""
+    slots = generate_slots(profile.availability or {})
+    if not slots:
+        return ""
+    return format_wat(slots[0].start_naive_utc)
 
 
 def build_tool_map() -> dict[str, Callable[[dict[str, Any]], Any]]:
@@ -505,77 +537,21 @@ def _bridge_tool_log(
     return _log
 
 
-def run_matching(
-    case: CaseFile,
-    run_id: str,
-    chat_client: ChatClient,
+def _rank_top3(
+    recording: _MatchRecorder,
+    gap_block: str,
+    context_block: str,
     model: str,
     effort: str | None,
-    source_text: str = "",
-) -> MatchOutcome:
-    """Research via tool loop, rank top 3 with validation and one retry.
+    run_id: str,
+    professor_ids: set[int],
+    gap_id_set: set[str],
+) -> tuple[dict[str, Any], bool]:
+    """One ranking call with validation, one retry, order-sort fallback.
 
-    Assumes a Flask app context (tools query the database). Persists
-    MatchResult rows. Raises on failure so the caller can mark the case.
+    Returns the ranking plus whether scores were sorted-and-flagged. Raises
+    ValueError when the ranking is still invalid after the retry.
     """
-    diagnosis = case.diagnosis or {}
-    gaps = diagnosis.get("gaps", []) or []
-    if not gaps:
-        raise ValueError("no grounded gaps to match on")
-    gap_ids = [f"g{index}" for index, _ in enumerate(gaps, 1)]
-    gap_block = "\n".join(
-        f"{gid}: [{gap.get('category')}] {gap.get('description')}"
-        for gid, gap in zip(gap_ids, gaps)
-    )
-    log_event(
-        run_id, "matching_started",
-        f"Matching started ({model})", payload={"model": model},
-    )
-    recording = _MatchRecorder(chat_client)
-    started = time.perf_counter()
-    research = (
-        "RANKING RESEARCH: find professors for this diagnosis.\n"
-        f"Field: {diagnosis.get('field', '?')} | Level: {diagnosis.get('level', '?')}\n"
-        f"Core problem: {diagnosis.get('core_problem', '')}\n"
-        f"Gaps:\n{gap_block}\n"
-        f"Keywords: {', '.join(diagnosis.get('expertise_keywords', []) or [])}"
-    )
-    records: list[ToolCallRecord] = []
-    try:
-        final_text = run_tool_loop(
-            recording,
-            [
-                {"role": "system", "content": MATCH_SYSTEM_PROMPT},
-                {"role": "user", "content": research},
-            ],
-            matching_tools(),
-            build_tool_map(),
-            model=model,
-            log_tool_call=_bridge_tool_log(run_id, records),
-            max_iterations=MATCH_MAX_ITERATIONS,
-            max_tool_calls=MATCH_MAX_TOOL_CALLS,
-            run_id=run_id,
-            effort=effort,
-        )
-    except ToolBudgetExceeded:
-        if not records:
-            raise
-        final_text = ""
-        log_event(
-            run_id, "tool_budget_exhausted",
-            f"Tool budget reached; ranking from {len(records)} findings",
-            payload={"findings": len(records)},
-        )
-    findings = "\n".join(
-        f"- {record.tool_name}({json_dumps(record.arguments)}) "
-        f"=> {(record.result or '')[:300]}"
-        for record in records
-        if record.status == "ok"
-    ) or "(no successful tool calls)"
-    professor_ids = {
-        row[0] for row in db.session.query(User.id).filter_by(role="professor")
-    }
-    gap_id_set = set(gap_ids)
     ranking: dict[str, Any] = {}
     errors: list[str] = []
     for attempt in (1, 2):
@@ -594,8 +570,7 @@ def run_matching(
                         "RANKING PASS: rank the top 3 professors as JSON.\n"
                         f"{SCORE_ANCHORS}\n"
                         f"Gaps (cite these ids):\n{gap_block}\n"
-                        f"Research findings:\n{findings}\n"
-                        f"Agent summary:\n{final_text or '(none; loop hit budget)'}\n"
+                        f"{context_block}\n"
                         f"{feedback}"
                     ),
                 },
@@ -627,6 +602,198 @@ def run_matching(
             )
         else:
             raise ValueError(f"ranking invalid after retry: {'; '.join(errors)}")
+    return ranking, score_flagged
+
+
+def _fast_candidates(
+    diagnosis: dict[str, Any],
+    run_id: str,
+    records: list[ToolCallRecord],
+) -> list[dict[str, Any]]:
+    """Retrieve top candidates, logging each step as a real tool call.
+
+    One search_professors call plus one get_professor_profile call per
+    candidate flow through the same bridge as the agentic loop, so the
+    timeline shows genuine operations with measured durations.
+    """
+    keywords = [
+        str(item)
+        for item in diagnosis.get("expertise_keywords", []) or []
+        if item
+    ]
+    field = diagnosis.get("field")
+    log_call = _bridge_tool_log(run_id, records)
+    tools = build_tool_map()
+    search_started = time.perf_counter()
+    candidates = retrieve_candidates(keywords, field)
+    log_call(
+        ToolCallRecord(
+            tool_name="search_professors",
+            arguments={
+                "keywords": keywords, "department": field,
+                "limit": FAST_CANDIDATE_LIMIT,
+            },
+            result=json_dumps(candidates),
+            status="ok",
+            error=None,
+            duration_ms=(time.perf_counter() - search_started) * 1000.0,
+            run_id=run_id,
+        )
+    )
+    for candidate in candidates:
+        profile_started = time.perf_counter()
+        profile = tools["get_professor_profile"](
+            {"professor_id": candidate["professor_id"]}
+        )
+        log_call(
+            ToolCallRecord(
+                tool_name="get_professor_profile",
+                arguments={"professor_id": candidate["professor_id"]},
+                result=json_dumps(profile),
+                status="ok",
+                error=None,
+                duration_ms=(time.perf_counter() - profile_started) * 1000.0,
+                run_id=run_id,
+            )
+        )
+        candidate["profile"] = profile
+    return candidates
+
+
+def _candidate_block(candidates: list[dict[str, Any]]) -> str:
+    """Full candidate profiles as ranking context (ids the model must use)."""
+    lines = []
+    for candidate in candidates:
+        profile = candidate.get("profile") or {}
+        areas = ", ".join((profile.get("research_areas") or [])[:6])
+        bio = str(profile.get("bio") or "")[:300]
+        rate = profile.get("rate")
+        lines.append(
+            f"- id {candidate['professor_id']}: "
+            f"{profile.get('display_name', '?')} "
+            f"({profile.get('department', '?')}; score {candidate['score']})\n"
+            f"  areas: {areas}\n"
+            f"  rate: {rate if rate is not None else 'on request'} naira\n"
+            f"  bio: {bio}"
+        )
+    return "\n".join(lines) or "(no candidates retrieved)"
+
+
+def run_matching(
+    case: CaseFile,
+    run_id: str,
+    chat_client: ChatClient,
+    model: str,
+    effort: str | None,
+    source_text: str = "",
+    *,
+    mode: str = "fast",
+    rank_model: str | None = None,
+    rank_effort: str | None = None,
+) -> MatchOutcome:
+    """Match professors in fast or agentic mode; persist top 3.
+
+    Fast (default): code retrieval over the top candidates plus one
+    ranking call (``rank_model`` or ``model``), with next slots computed
+    in code for the final 3. Agentic: the 3-turn batched tool loop, with
+    model-provided slots. Assumes a Flask app context. Raises on failure
+    so the caller can mark the case.
+    """
+    if mode not in ("fast", "agentic"):
+        raise ValueError(f"MATCH_MODE must be fast|agentic (got {mode!r})")
+    diagnosis = case.diagnosis or {}
+    gaps = diagnosis.get("gaps", []) or []
+    if not gaps:
+        raise ValueError("no grounded gaps to match on")
+    gap_ids = [f"g{index}" for index, _ in enumerate(gaps, 1)]
+    gap_block = "\n".join(
+        f"{gid}: [{gap.get('category')}] {gap.get('description')}"
+        for gid, gap in zip(gap_ids, gaps)
+    )
+    log_event(
+        run_id, "matching_started",
+        f"Matching started ({model}, {mode})",
+        payload={"model": model, "mode": mode},
+    )
+    recording = _MatchRecorder(chat_client)
+    started = time.perf_counter()
+    records: list[ToolCallRecord] = []
+    if mode == "agentic":
+        research = (
+            "RANKING RESEARCH: find professors for this diagnosis.\n"
+            f"Field: {diagnosis.get('field', '?')} | "
+            f"Level: {diagnosis.get('level', '?')}\n"
+            f"Core problem: {diagnosis.get('core_problem', '')}\n"
+            f"Gaps:\n{gap_block}\n"
+            f"Keywords: {', '.join(diagnosis.get('expertise_keywords', []) or [])}"
+        )
+        try:
+            final_text = run_tool_loop(
+                recording,
+                [
+                    {"role": "system", "content": MATCH_SYSTEM_PROMPT},
+                    {"role": "user", "content": research},
+                ],
+                matching_tools(),
+                build_tool_map(),
+                model=model,
+                log_tool_call=_bridge_tool_log(run_id, records),
+                max_iterations=MATCH_MAX_ITERATIONS,
+                max_tool_calls=MATCH_MAX_TOOL_CALLS,
+                run_id=run_id,
+                effort=effort,
+            )
+        except ToolBudgetExceeded:
+            if not records:
+                raise
+            final_text = ""
+            log_event(
+                run_id, "tool_budget_exhausted",
+                f"Tool budget reached; ranking from {len(records)} findings",
+                payload={"findings": len(records)},
+            )
+        findings = "\n".join(
+            f"- {record.tool_name}({json_dumps(record.arguments)}) "
+            f"=> {(record.result or '')[:300]}"
+            for record in records
+            if record.status == "ok"
+        ) or "(no successful tool calls)"
+        context_block = (
+            f"Research findings:\n{findings}\n"
+            f"Agent summary:\n{final_text or '(none; loop hit budget)'}"
+        )
+        ranking_model, ranking_effort = model, effort
+    else:
+        candidates = _fast_candidates(diagnosis, run_id, records)
+        context_block = (
+            "Candidates (rank ONLY these ids):\n"
+            f"{_candidate_block(candidates)}"
+        )
+        ranking_model = rank_model or model
+        ranking_effort = rank_effort if rank_effort is not None else effort
+    professor_ids = {
+        row[0] for row in db.session.query(User.id).filter_by(role="professor")
+    }
+    gap_id_set = set(gap_ids)
+    ranking, score_flagged = _rank_top3(
+        recording, gap_block, context_block, ranking_model, ranking_effort,
+        run_id, professor_ids, gap_id_set,
+    )
+    if mode == "fast":
+        computed = 0
+        for match in ranking["matches"]:
+            profile = ProfessorProfile.query.filter_by(
+                user_id=match["professor_id"]
+            ).first()
+            slot = first_open_slot(profile) if profile is not None else ""
+            if slot:
+                match["next_slot"] = slot
+                computed += 1
+        log_event(
+            run_id, "slots_computed",
+            f"Next slots computed in code for {computed}/3 finalists",
+            payload={"computed": computed},
+        )
     log_event(run_id, "matching_validated", "Ranking validated: 3 matches")
     rows = []
     for rank, match in enumerate(ranking["matches"], 1):

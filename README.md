@@ -62,7 +62,10 @@ PDF/DOCX/TXT extraction, upload validation, grounding checker, owner-only
 access, CSRF on the intake form, background pipeline runs (fake client).
 Parallel coverage: specialist merge/rank, partial and total failure, merge
 failure, bad mode flag. Matching coverage: tool scoring, ranking validator,
-retry-once, budget degrade, tool-call logging, professors routes. Booking
+retry-once, budget degrade, tool-call logging, professors routes, fast
+retrieval, MATCH_MODE switch, rank-model routing. Clarification coverage:
+question validation, budget/times/goal/deadline constraints, relaxation,
+speculative handoff, answers views. Booking
 coverage: slot grid and timezones, double-booking race, consent gating,
 sessions access. Email coverage: providers, recipient override, idempotency,
 refusals, content builders.
@@ -77,7 +80,7 @@ app/
   models.py          User, ProfessorProfile, StudentProfile, Document,
                      CaseFile, Booking, SessionRecord, MemoryNote, RunEvent,
                      MatchResult, EmailLog, Notification, LedgerEntry,
-                     ToolCallLog
+                     Message, ClarificationQA, ToolCallLog
   security.py        current_user, login_required, role_required
   blueprints/        auth (register/login/logout), cases (role dashboards,
                      intake, detail, events, booking, sessions, case file),
@@ -89,6 +92,7 @@ app/
     extraction.py    upload validation, storage, text extraction
     diagnosis.py     parallel/single diagnosis, grounding, intake pipeline
     matching.py      professor tools, ranking, validation, match runner
+    clarification.py one-round questions, answer constraints, relaxation
     slots.py         60-minute slot grid (UTC store, WAT display)
     booking.py       race-safe booking creation, Jitsi links, demo refs
     booking_workflow.py request state machine, transitions, expiry

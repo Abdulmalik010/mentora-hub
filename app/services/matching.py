@@ -605,41 +605,17 @@ def _rank_top3(
     return ranking, score_flagged
 
 
-def _fast_candidates(
-    diagnosis: dict[str, Any],
+MIN_SNAPSHOT_REUSE = 3
+
+
+def _attach_profiles(
+    candidates: list[dict[str, Any]],
     run_id: str,
     records: list[ToolCallRecord],
 ) -> list[dict[str, Any]]:
-    """Retrieve top candidates, logging each step as a real tool call.
-
-    One search_professors call plus one get_professor_profile call per
-    candidate flow through the same bridge as the agentic loop, so the
-    timeline shows genuine operations with measured durations.
-    """
-    keywords = [
-        str(item)
-        for item in diagnosis.get("expertise_keywords", []) or []
-        if item
-    ]
-    field = diagnosis.get("field")
+    """Fetch each candidate's profile, logging the reads as tool calls."""
     log_call = _bridge_tool_log(run_id, records)
     tools = build_tool_map()
-    search_started = time.perf_counter()
-    candidates = retrieve_candidates(keywords, field)
-    log_call(
-        ToolCallRecord(
-            tool_name="search_professors",
-            arguments={
-                "keywords": keywords, "department": field,
-                "limit": FAST_CANDIDATE_LIMIT,
-            },
-            result=json_dumps(candidates),
-            status="ok",
-            error=None,
-            duration_ms=(time.perf_counter() - search_started) * 1000.0,
-            run_id=run_id,
-        )
-    )
     for candidate in candidates:
         profile_started = time.perf_counter()
         profile = tools["get_professor_profile"](
@@ -658,6 +634,91 @@ def _fast_candidates(
         )
         candidate["profile"] = profile
     return candidates
+
+
+def log_speculative_search(
+    run_id: str,
+    keywords: list[str],
+    field: str | None,
+    records: list[ToolCallRecord] | None = None,
+) -> list[dict[str, Any]]:
+    """Run retrieval now, logging the search as a real tool call.
+
+    Used both by fast matching and by the clarification phase, which
+    retrieves while the student answers so the post-answer ranking needs
+    no new search.
+    """
+    search_started = time.perf_counter()
+    candidates = retrieve_candidates(keywords, field)
+    _bridge_tool_log(run_id, records if records is not None else [])(
+        ToolCallRecord(
+            tool_name="search_professors",
+            arguments={
+                "keywords": keywords, "department": field,
+                "limit": FAST_CANDIDATE_LIMIT,
+            },
+            result=json_dumps(candidates),
+            status="ok",
+            error=None,
+            duration_ms=(time.perf_counter() - search_started) * 1000.0,
+            run_id=run_id,
+        )
+    )
+    return candidates
+
+
+def _fast_candidates(
+    keywords: list[str],
+    field: str | None,
+    run_id: str,
+    records: list[ToolCallRecord],
+) -> list[dict[str, Any]]:
+    """Retrieve top candidates, logging each step as a real tool call.
+
+    One search_professors call plus one get_professor_profile call per
+    candidate flow through the same bridge as the agentic loop, so the
+    timeline shows genuine operations with measured durations.
+    """
+    candidates = log_speculative_search(run_id, keywords, field, records)
+    return _attach_profiles(candidates, run_id, records)
+
+
+def _snapshot_candidates(
+    snapshot: dict[str, Any],
+    run_id: str,
+    records: list[ToolCallRecord],
+) -> list[dict[str, Any]]:
+    """Reuse speculative candidates, dropping dead or opted-out ids.
+
+    Falls back to a fresh logged search when fewer than 3 survive, so
+    the ranker never starves because the directory changed mid-answer.
+    """
+    wanted = [
+        (int(item["professor_id"]), int(item.get("score", 0)))
+        for item in snapshot.get("candidates", []) or []
+        if isinstance(item, dict) and "professor_id" in item
+    ]
+    live: list[dict[str, Any]] = []
+    for professor_id, score in wanted:
+        user = db.session.get(User, professor_id)
+        profile = ProfessorProfile.query.filter_by(user_id=professor_id).first()
+        if (
+            user is None
+            or profile is None
+            or user.role != "professor"
+            or profile.accepting_new is False
+        ):
+            continue
+        live.append({"professor_id": professor_id, "score": score})
+    if len(live) >= MIN_SNAPSHOT_REUSE:
+        log_event(
+            run_id, "candidates_reused",
+            f"Reusing {len(live)} pre-answer candidates (no new search)",
+            payload={"count": len(live)},
+        )
+        return _attach_profiles(live, run_id, records)
+    keywords = [str(item) for item in snapshot.get("keywords", []) or []]
+    return _fast_candidates(keywords, snapshot.get("field"), run_id, records)
 
 
 def _candidate_block(candidates: list[dict[str, Any]]) -> str:
@@ -690,14 +751,16 @@ def run_matching(
     mode: str = "fast",
     rank_model: str | None = None,
     rank_effort: str | None = None,
+    snapshot: dict[str, Any] | None = None,
 ) -> MatchOutcome:
     """Match professors in fast or agentic mode; persist top 3.
 
     Fast (default): code retrieval over the top candidates plus one
     ranking call (``rank_model`` or ``model``), with next slots computed
-    in code for the final 3. Agentic: the 3-turn batched tool loop, with
-    model-provided slots. Assumes a Flask app context. Raises on failure
-    so the caller can mark the case.
+    in code for the final 3. A ``snapshot`` from speculative retrieval
+    skips the search (dead/opted-out ids still re-validated). Agentic:
+    the 3-turn batched tool loop, with model-provided slots. Assumes a
+    Flask app context. Raises on failure so the caller can mark the case.
     """
     if mode not in ("fast", "agentic"):
         raise ValueError(f"MATCH_MODE must be fast|agentic (got {mode!r})")
@@ -762,13 +825,29 @@ def run_matching(
             f"Research findings:\n{findings}\n"
             f"Agent summary:\n{final_text or '(none; loop hit budget)'}"
         )
+        agentic_constraint = (snapshot or {}).get("constraint_block", "")
+        if agentic_constraint:
+            context_block += f"\n{agentic_constraint}"
         ranking_model, ranking_effort = model, effort
     else:
-        candidates = _fast_candidates(diagnosis, run_id, records)
+        if snapshot is not None:
+            candidates = _snapshot_candidates(snapshot, run_id, records)
+        else:
+            keywords = [
+                str(item)
+                for item in diagnosis.get("expertise_keywords", []) or []
+                if item
+            ]
+            candidates = _fast_candidates(
+                keywords, diagnosis.get("field"), run_id, records
+            )
         context_block = (
             "Candidates (rank ONLY these ids):\n"
             f"{_candidate_block(candidates)}"
         )
+        constraint = (snapshot or {}).get("constraint_block", "")
+        if constraint:
+            context_block += f"\n{constraint}"
         ranking_model = rank_model or model
         ranking_effort = rank_effort if rank_effort is not None else effort
     professor_ids = {

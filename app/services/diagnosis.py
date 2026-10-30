@@ -319,11 +319,15 @@ def run_case_pipeline(
     match_client: ChatClient | None = None,
     match_model: str | None = None,
     match_effort: str | None = None,
+    clarify_client: ChatClient | None = None,
+    clarify_model: str | None = None,
+    clarify_effort: str | None = None,
 ) -> None:
     """Run intake for one case: extract, diagnose, ground, match, persist.
 
     Designed for a background thread; opens its own app context. Every step
-    writes a real RunEvent. Failures mark the case ``error`` with a
+    writes a real RunEvent. A clarification round may pause the pipeline at
+    ``awaiting_answers``; failures mark the case ``error`` with a
     ``run_failed`` event instead of raising.
     """
     with app.app_context():
@@ -342,6 +346,11 @@ def run_case_pipeline(
                 _run_parallel(app, case, run_id, chat_client, model, effort)
             else:
                 _run_pipeline(case, run_id, chat_client, model, effort)
+            proceed = _run_clarification_phase(
+                case, run_id, clarify_client, clarify_model, clarify_effort
+            )
+            if not proceed:
+                return  # status is awaiting_answers; matching runs on submit
             _run_matching_phase(
                 app, case, run_id, match_client, match_model, match_effort
             )
@@ -351,6 +360,114 @@ def run_case_pipeline(
             case.status = "error"
             db.session.commit()
             log_event(run_id, "run_failed", f"Run failed: {exc}", status="error")
+
+
+def run_post_answer_matching(
+    app: Flask,
+    case_id: int,
+    run_id: str,
+    match_client: ChatClient | None = None,
+    match_model: str | None = None,
+    match_effort: str | None = None,
+) -> None:
+    """Run matching after the student submits or skips clarifying answers.
+
+    Designed for a background thread; opens its own app context. Uses the
+    speculative snapshot (updated with constraints at submit time), so the
+    post-answer wait is one ranking call. Failures mark ``error``.
+    """
+    with app.app_context():
+        case = db.session.get(CaseFile, case_id)
+        if case is None:
+            return
+        case.status = "running"
+        db.session.commit()
+        try:
+            _run_matching_phase(
+                app, case, run_id, match_client, match_model, match_effort
+            )
+            case.status = "done"
+            db.session.commit()
+        except Exception as exc:
+            case.status = "error"
+            db.session.commit()
+            log_event(run_id, "run_failed", f"Run failed: {exc}", status="error")
+
+
+def _run_clarification_phase(
+    case: CaseFile,
+    run_id: str,
+    clarify_client: ChatClient | None,
+    clarify_model: str | None,
+    clarify_effort: str | None,
+) -> bool:
+    """Speculate retrieval, maybe ask 0-3 questions; False pauses matching.
+
+    Always persists a candidate snapshot first (code retrieval, logged as
+    a real tool call), so submit/skip only needs the ranking call. Returns
+    False with status ``awaiting_answers`` when questions were asked.
+    Question generation never blocks matching: failures log and proceed.
+    """
+    # Local imports: matching/clarification depend on diagnosis helpers.
+    from .clarification import (
+        generate_questions,
+        log_questions_ready,
+        persist_questions,
+    )
+    from .matching import log_speculative_search
+
+    diagnosis = case.diagnosis or {}
+    keywords = [
+        str(item)
+        for item in diagnosis.get("expertise_keywords", []) or []
+        if item
+    ]
+    field = diagnosis.get("field")
+    hits = log_speculative_search(run_id, keywords, field)
+    case.candidate_snapshot = {
+        "keywords": keywords,
+        "field": field,
+        "candidates": [
+            {
+                "professor_id": hit["professor_id"],
+                "score": hit["score"],
+                "rate": hit.get("rate"),
+            }
+            for hit in hits
+        ],
+        "constraint_block": "",
+        "filters_applied": [],
+        "relaxed": [],
+    }
+    db.session.commit()
+    gaps = diagnosis.get("gaps", []) or []
+    gap_ids = [f"g{index}" for index, _ in enumerate(gaps, 1)]
+    try:
+        if clarify_client is None or clarify_model is None:
+            settings = MetaSettings.from_env()
+            clarify_client = clarify_client or OpenAICompatChatClient(settings)
+            clarify_model = clarify_model or settings.model_fast
+            if clarify_effort is None:
+                clarify_effort = settings.effort_fast
+            if not clarify_model:
+                raise ValueError("META_MODEL_FAST is required for questions")
+        questions = generate_questions(
+            clarify_client, diagnosis, gap_ids, clarify_model, clarify_effort
+        )
+    except Exception as exc:
+        log_event(
+            run_id, "questions_failed",
+            f"Clarifying questions failed ({exc}); matching anyway",
+            status="error",
+        )
+        return True
+    if not questions:
+        return True
+    persist_questions(case.id, questions)
+    case.status = "awaiting_answers"
+    db.session.commit()
+    log_questions_ready(run_id, len(questions))
+    return False
 
 
 def _run_matching_phase(
@@ -402,6 +519,7 @@ def _run_matching_phase(
     run_matching(
         case, run_id, match_client, match_model, match_effort, source,
         mode=mode, rank_model=rank_model, rank_effort=rank_effort,
+        snapshot=case.candidate_snapshot,
     )
 
 

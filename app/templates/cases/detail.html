@@ -3,12 +3,12 @@
 {% block title %}Case #{{ case.id }} · Mentora Academic Hub{% endblock %}
 {% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
-{% set tone = {"done": "ok", "running": "info", "error": "bad"}.get(case.status, "neutral") %}
+{% set tone = {"done": "ok", "running": "info", "error": "bad", "awaiting_answers": "warn"}.get(case.status, "neutral") %}
 {% set types = events | map(attribute="type") | list %}
 {% set ns = namespace(step=1) %}
 {% if "text_extracted" in types or "native_pdf_fallback" in types %}{% set ns.step = 3 %}{% elif types %}{% set ns.step = 2 %}{% endif %}
 {% if "diagnosis_finished" in types or "merge_finished" in types %}{% set ns.step = 4 %}{% elif "diagnosis_started" in types %}{% set ns.step = 3 %}{% endif %}
-{% if "matching_finished" in types %}{% set ns.step = 5 %}{% elif "matching_started" in types %}{% set ns.step = 4 %}{% endif %}
+{% if "matching_finished" in types %}{% set ns.step = 5 %}{% elif "matching_started" in types or "questions_ready" in types %}{% set ns.step = 4 %}{% endif %}
 <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
   <div class="min-w-0">
     <p class="text-sm font-semibold text-brand"><a href="{{ url_for('cases.dashboard') }}" class="hover:text-brand-hover">← All cases</a></p>
@@ -107,8 +107,50 @@
           </div>
         {% endif %}
       </div>
+      {% if questions %}
+        <h2 class="mb-4 mt-10 font-display text-xl font-semibold tracking-tight">Mentora needs {{ questions|length }} quick answer{{ "s" if questions|length != 1 else "" }}</h2>
+        {% call card() %}
+          <form method="post" action="{{ url_for('cases.submit_answers', case_id=case.id) }}" class="mt-2 space-y-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% for q in questions %}
+              <fieldset>
+                <legend class="text-sm font-semibold">{{ q.question }}</legend>
+                <p class="mt-1 text-xs text-muted">Why we ask: {{ q.why }}
+                  {% for gid in q.gap_ids or [] %}<a href="#gap-{{ gid }}" class="font-medium text-brand hover:text-brand-hover">{{ gid }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+                </p>
+                {% if q.qtype == "choice" and q.options %}
+                  <div class="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="{{ q.question }}">
+                    {% for option in q.options %}
+                      <label class="cursor-pointer rounded-full border border-border bg-paper px-4 py-1.5 text-sm font-medium has-checked:border-brand has-checked:bg-brand-tint has-checked:text-brand">
+                        <input type="radio" name="choice_{{ q.id }}" value="{{ option }}" class="sr-only">
+                        {{ option }}
+                      </label>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <input type="text" name="text_{{ q.id }}" maxlength="500" placeholder="{% if q.qtype == 'choice' %}Or type your own answer{% else %}Your answer{% endif %}"
+                       aria-label="{% if q.qtype == 'choice' %}Custom answer{% else %}{{ q.question }}{% endif %}"
+                       class="mt-2 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30">
+              </fieldset>
+            {% endfor %}
+            <div class="flex flex-wrap gap-3">
+              <button type="submit" name="action" value="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-hover">Submit and match</button>
+              <button type="submit" name="action" value="skip" class="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-muted">Skip and match now</button>
+            </div>
+          </form>
+        {% endcall %}
+      {% endif %}
       {% if match_cards %}
         <h2 class="mb-4 mt-10 font-display text-xl font-semibold tracking-tight">Recommended professors</h2>
+        {% if filters_applied or filters_relaxed %}
+          <div class="mb-4 rounded-xl border border-brand/30 bg-brand-tint px-4 py-3 text-sm">
+            <p class="font-semibold">Filters applied from your answers</p>
+            <ul class="mt-1 list-disc space-y-0.5 pl-5 text-muted">
+              {% for f in filters_applied %}<li>{{ f }}</li>{% endfor %}
+              {% for f in filters_relaxed %}<li>{{ f }}</li>{% endfor %}
+            </ul>
+          </div>
+        {% endif %}
         <div class="space-y-4">
           {% for card in match_cards %}
             {% set m = card.match %}{% set prof = card.professor %}{% set p = card.profile %}

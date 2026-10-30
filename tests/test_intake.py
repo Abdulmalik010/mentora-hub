@@ -64,6 +64,10 @@ def _stub_matching(monkeypatch):  # type: ignore[no-untyped-def]
     monkeypatch.setattr(
         "app.services.diagnosis._run_matching_phase", lambda *args, **kwargs: None
     )
+    monkeypatch.setattr(
+        "app.services.diagnosis._run_clarification_phase",
+        lambda *args, **kwargs: True,
+    )
 
 
 class CannedJsonClient:

@@ -15,8 +15,8 @@ from flask import Flask
 
 from ..extensions import db
 from ..models import (
-    Booking, CaseFile, Document, MatchResult, ProfessorProfile, RunEvent,
-    User,
+    Booking, CaseFile, ClarificationQA, Document, MatchResult,
+    ProfessorProfile, RunEvent, User,
 )
 from ..security import current_user, login_required, role_required
 from ..services.booking import (
@@ -32,7 +32,8 @@ from ..services.booking_workflow import (
     apply_transition,
     expire_stale_bookings,
 )
-from ..services.diagnosis import run_case_pipeline
+from ..services.clarification import apply_answer_constraints, load_answers
+from ..services.diagnosis import log_event, run_case_pipeline, run_post_answer_matching
 from ..services.email_service import (
     case_file_context,
     send_accepted_emails,
@@ -308,6 +309,15 @@ def _launch_pipeline(app: Flask, case_id: int, run_id: str) -> None:
     thread.start()
 
 
+def _launch_matching(app: Flask, case_id: int, run_id: str) -> None:
+    """Start post-answer matching in a daemon thread (monkeypatched in tests)."""
+    thread = threading.Thread(
+        target=run_post_answer_matching, args=(app, case_id, run_id),
+        daemon=True,
+    )
+    thread.start()
+
+
 @bp.post("/cases/new")
 @role_required("student")
 def create_case() -> Response | tuple[str, int]:
@@ -371,9 +381,103 @@ def detail(case_id: int) -> str:
             match_cards.append(
                 {"match": match, "professor": professor, "profile": profile}
             )
+    questions: list[ClarificationQA] = []
+    if case.status == "awaiting_answers":
+        questions = (
+            ClarificationQA.query.filter_by(case_id=case.id)
+            .order_by(ClarificationQA.id)
+            .all()
+        )
+    snapshot = case.candidate_snapshot or {}
     return render_template(
-        "cases/detail.html", case=case, events=events, match_cards=match_cards
+        "cases/detail.html", case=case, events=events, match_cards=match_cards,
+        questions=questions,
+        filters_applied=snapshot.get("filters_applied", []) or [],
+        filters_relaxed=snapshot.get("relaxed", []) or [],
     )
+
+
+@bp.post("/cases/<int:case_id>/answers")
+@role_required("student")
+def submit_answers(case_id: int) -> Response:
+    """Store clarifying answers (or skip), constrain, launch matching.
+
+    One round only: the case must be ``awaiting_answers``. Submit applies
+    the answers as retrieval constraints; skip matches the raw snapshot.
+    """
+    case = _own_case_or_404(case_id)
+    if case.status != "awaiting_answers":
+        flash("This case is not waiting for answers.", "error")
+        return redirect(
+            url_for("cases.detail", case_id=case.id), code=303
+        )
+    action = request.form.get("action", "submit")
+    rows = (
+        ClarificationQA.query.filter_by(case_id=case.id)
+        .order_by(ClarificationQA.id)
+        .all()
+    )
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if action == "skip":
+        if case.run_id:
+            log_event(case.run_id, "answers_skipped", "Student skipped; matching now")
+        flash("Skipped. Matching on the diagnosis alone.", "success")
+    else:
+        for row in rows:
+            choice = request.form.get(f"choice_{row.id}", "").strip()
+            text = request.form.get(f"text_{row.id}", "").strip()
+            answer = text or choice
+            if answer:
+                row.answer = answer[:2000]
+                row.answered_at = now
+        answers = load_answers(case.id)
+        _apply_constraints_to_snapshot(case, answers)
+        if case.run_id:
+            log_event(
+                case.run_id, "answers_submitted",
+                f"Student answered {len(answers)}/{len(rows)}; matching now",
+                payload={"answered": len(answers), "asked": len(rows)},
+            )
+        flash("Answers saved. Matching now.", "success")
+    case.status = "running"
+    db.session.commit()
+    _launch_matching(current_app, case.id, case.run_id or "")
+    return redirect(url_for("cases.detail", case_id=case.id), code=303)
+
+
+def _apply_constraints_to_snapshot(
+    case: CaseFile, answers: dict[str, str]
+) -> None:
+    """Filter/boost the snapshot candidates from answers (caller commits).
+
+    Rates ride in the snapshot, so no re-retrieval is needed at submit;
+    times overlap reads live profiles (availability may have changed).
+    """
+    snapshot = dict(case.candidate_snapshot or {})
+    candidates = [
+        {
+            "professor_id": item["professor_id"],
+            "score": item.get("score", 0),
+            "rate": item.get("rate"),
+        }
+        for item in snapshot.get("candidates", []) or []
+        if isinstance(item, dict) and "professor_id" in item
+    ]
+    if not candidates:
+        return
+    constrained = apply_answer_constraints(candidates, answers)
+    snapshot["candidates"] = [
+        {
+            "professor_id": hit["professor_id"],
+            "score": hit["score"],
+            "rate": hit.get("rate"),
+        }
+        for hit in constrained.candidates
+    ]
+    snapshot["constraint_block"] = constrained.prompt_block
+    snapshot["filters_applied"] = constrained.filters_applied
+    snapshot["relaxed"] = constrained.relaxed
+    case.candidate_snapshot = snapshot
 
 
 @bp.get("/cases/<int:case_id>/events")

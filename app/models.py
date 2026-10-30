@@ -126,6 +126,7 @@ class CaseFile(db.Model):
     run_id = db.Column(db.String(64), nullable=True, index=True)
     grounding_rate = db.Column(db.Float, nullable=True)
     diagnosis = db.Column(db.JSON, nullable=False, default=dict)
+    candidate_snapshot = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     student = db.relationship("User", foreign_keys=[student_id])
@@ -255,6 +256,32 @@ class MatchResult(db.Model):
 
     case = db.relationship("CaseFile", foreign_keys=[case_id])
     professor = db.relationship("User", foreign_keys=[professor_id])
+
+
+class ClarificationQA(db.Model):
+    """One clarifying question (and optional answer) for a case.
+
+    Rows are written when the agent asks; ``answer`` stays NULL when the
+    student skips. One round only: no follow-ups reference these rows.
+    """
+
+    __tablename__ = "clarification_qas"
+
+    id = db.Column(db.Integer, primary_key=True)
+    case_id = db.Column(
+        db.Integer, db.ForeignKey("case_files.id"), nullable=False, index=True
+    )
+    question_key = db.Column(db.String(20), nullable=False)  # budget|deadline|times|goal
+    question = db.Column(db.Text, nullable=False)
+    qtype = db.Column(db.String(10), nullable=False)  # choice|text
+    options = db.Column(db.JSON, nullable=False, default=list)
+    why = db.Column(db.Text, nullable=False, default="")
+    gap_ids = db.Column(db.JSON, nullable=False, default=list)
+    answer = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    answered_at = db.Column(db.DateTime, nullable=True)
+
+    case = db.relationship("CaseFile", foreign_keys=[case_id])
 
 
 class EmailLog(db.Model):

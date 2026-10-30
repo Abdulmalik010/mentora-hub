@@ -103,7 +103,7 @@ def new_form() -> str:
 
 
 def _professor_dashboard(user: User) -> str:
-    """Upcoming active bookings for one professor, soonest first."""
+    """Professor workspace: stats plus requests/upcoming/inbox/profile tabs."""
     _expire_stale()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     bookings = (
@@ -116,14 +116,47 @@ def _professor_dashboard(user: User) -> str:
         .order_by(Booking.scheduled_at.asc())
         .all()
     )
-    rows = [
-        {
-            "booking": booking,
-            "student": db.session.get(User, booking.student_id),
-        }
-        for booking in bookings
-    ]
-    return render_template("cases/prof_dashboard.html", rows=rows)
+    requests, upcoming = [], []
+    for booking in bookings:
+        student = db.session.get(User, booking.student_id)
+        case = (
+            db.session.get(CaseFile, booking.case_id)
+            if booking.case_id
+            else None
+        )
+        preview = None
+        if case is not None:
+            context = case_file_context(case)
+            preview = {
+                "core_problem": context["core_problem"],
+                "gaps": context["gaps"][:2],
+                "question_count": len(context["questions"]),
+            }
+        row = {"booking": booking, "student": student, "preview": preview}
+        if booking.status in ("requested", "reschedule_proposed"):
+            requests.append(row)
+        else:
+            upcoming.append(row)
+    profile = ProfessorProfile.query.filter_by(user_id=user.id).first()
+    proposal_slots = _open_slots(user.id, profile) if profile else []
+    tab = request.args.get("tab", "requests")
+    if tab not in ("requests", "upcoming", "inbox", "profile"):
+        tab = "requests"
+    return render_template(
+        "cases/prof_dashboard.html",
+        demo_balance=demo_balance(user),
+        pending_count=sum(
+            1 for row in requests
+            if row["booking"].status == "requested"
+        ),
+        upcoming_count=len(upcoming),
+        unread_messages=0,  # wired when per-booking messaging lands
+        requests=requests,
+        upcoming=upcoming,
+        profile=profile,
+        proposal_slots=proposal_slots,
+        active_tab=tab,
+    )
 
 
 @bp.get("/dashboard/bookings/<int:booking_id>")

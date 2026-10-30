@@ -47,7 +47,7 @@ def test_seeded_professor_login_and_dashboard(app: Flask) -> None:
     html = page.get_data(as_text=True)
     assert "Upcoming sessions" in html
     assert "Sample Student 01" in html
-    assert "Open case file" in html
+    assert "Full case file" in html
 
 
 def test_professor_dashboard_lists_own_upcoming_only(app: Flask) -> None:
@@ -71,7 +71,7 @@ def test_professor_dashboard_lists_own_upcoming_only(app: Flask) -> None:
     client = app.test_client()
     login_professor(client, 12)
     html = client.get("/dashboard").get_data(as_text=True)
-    assert html.count("Open case file") == 1
+    assert html.count("Full case file") == 1
     from app.services.slots import format_wat
 
     assert format_wat(mine.scheduled_at) in html
@@ -144,6 +144,97 @@ def test_case_file_access_control(app: Flask) -> None:
     db.session.commit()
     login_professor(client, 12)  # the booked professor, consent withdrawn
     assert client.get(url).status_code == 404
+
+
+def test_workspace_stats_and_tabs(app: Flask) -> None:
+    """Stats are real counts; all four tabs render with badges."""
+    from app.services.booking_workflow import apply_transition
+
+    case, prof_id = seed_booking_case()
+    pending = create_booking(
+        student_id=case.student_id, professor_id=prof_id, case_id=case.id,
+        start_naive_utc=future_start(3), consent_share_diagnosis=True,
+        idempotency_key="tok-ws-stats-1",
+    )
+    accepted = create_booking(
+        student_id=case.student_id, professor_id=prof_id, case_id=case.id,
+        start_naive_utc=future_start(4), consent_share_diagnosis=True,
+        idempotency_key="tok-ws-stats-2",
+    )
+    professor = db.session.get(User, prof_id)
+    assert professor is not None
+    apply_transition(accepted.id, "accept", actor_user=professor)
+    client = app.test_client()
+    login_professor(client, 12)
+    html = client.get("/dashboard").get_data(as_text=True)
+    assert "Demo balance" in html and "₦19,800 demo" in html
+    assert "Pending requests" in html
+    assert "Upcoming sessions" in html
+    assert "Unread messages" in html
+    for tab in ("Requests", "Upcoming", "Inbox", "Profile"):
+        assert f">{tab}" in html or f'id="tab-{tab.lower()}"' in html
+    assert "Weak identification strategy." in html  # case preview
+    assert "methodology" in html
+    assert f"/dashboard/bookings/{pending.id}/accept" in html
+    assert f"/dashboard/bookings/{pending.id}/decline" in html
+    assert f"/dashboard/bookings/{pending.id}/propose" in html
+    assert "Join video" in html  # accepted session in Upcoming
+
+
+def test_workspace_request_actions_inline(app: Flask) -> None:
+    """Dashboard forms drive the same endpoints as the case-file page."""
+    from app.models import ProfessorProfile
+
+    from app.services.slots import generate_slots
+
+    case, prof_id = seed_booking_case()
+    first = create_booking(
+        student_id=case.student_id, professor_id=prof_id, case_id=case.id,
+        start_naive_utc=future_start(3), consent_share_diagnosis=True,
+        idempotency_key="tok-ws-act-1",
+    )
+    second = create_booking(
+        student_id=case.student_id, professor_id=prof_id, case_id=case.id,
+        start_naive_utc=future_start(5), consent_share_diagnosis=True,
+        idempotency_key="tok-ws-act-2",
+    )
+    client = app.test_client()
+    login_professor(client, 12)
+    assert client.post(
+        f"/dashboard/bookings/{first.id}/accept"
+    ).status_code == 303
+    profile = ProfessorProfile.query.filter_by(user_id=prof_id).one()
+    slot = [
+        s for s in generate_slots(profile.availability or {})
+        if s.start_naive_utc != second.scheduled_at
+    ][0]
+    assert client.post(
+        f"/dashboard/bookings/{second.id}/propose",
+        data={"new_slot": slot.key},
+    ).status_code == 303
+    html = client.get("/dashboard").get_data(as_text=True)
+    assert "Waiting on the student" in html
+
+
+def test_workspace_empty_states_and_profile(app: Flask) -> None:
+    """Each tab has a designed empty state; the profile tab summarizes."""
+    seed_booking_case()
+    client = app.test_client()
+    login_professor(client, 3)
+    for tab, heading in (
+        ("requests", "No pending requests"),
+        ("upcoming", "No upcoming sessions"),
+        ("inbox", "No messages yet"),
+    ):
+        html = client.get(f"/dashboard?tab={tab}").get_data(as_text=True)
+        assert heading in html
+    profile_html = client.get("/dashboard?tab=profile").get_data(as_text=True)
+    assert "Dr. Yuki Tanaka" in profile_html
+    assert "Statistics" in profile_html
+    assert "Time series" in profile_html
+    assert "₦13,000" in profile_html
+    assert "View public profile" in profile_html
+    assert client.get("/dashboard?tab=bogus").status_code == 200
 
 
 def test_professor_blocked_from_student_routes(app: Flask) -> None:

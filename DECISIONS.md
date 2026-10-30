@@ -85,3 +85,5 @@
 - 2026-10-30: Requests hold the request-time rate (free sessions skip the ledger); accept captures with the professor credited minus a floored 10% platform fee (user NULL); decline/cancel/expire release; builders are idempotent.
 - 2026-10-30: Booking creation check-then-insert runs under a process lock (single-process guard against overspend races; multi-process needs row locks).
 - 2026-10-30: Part A needs no fresh dev DB (new table only); Part D will (new column on professor_profiles).
+- 2026-10-30: Professor workspace is one page: 4 stat cards plus JS tabs (requests/upcoming/inbox/profile, ?tab= deep link); request cards carry a case preview (core problem, top 2 gaps) and the same action endpoints.
+- 2026-10-30: Workspace Inbox tab and Unread stat are placeholders until per-booking messaging lands (empty state, 0); Profile tab is read-only until the editor lands.

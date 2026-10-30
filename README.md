@@ -100,7 +100,7 @@ app/
     email_service.py Resend HTTPS or local outbox, case-file + confirmation
     notifications.py inbox rows, unread counts, transition fan-out
     messaging.py     per-booking threads, rate limits, read state
-    transcription.py stub (Muse Voice Transcribe)
+    transcription.py Muse Voice Transcribe (WAV-only, diarization)
     pdf_service.py   stub (library TBD)
 scripts/seed.py      idempotent synthetic seed (35 profs / 15 depts / 3 students)
 scripts/check_meta.py live Meta API smoke test (never run by pytest)

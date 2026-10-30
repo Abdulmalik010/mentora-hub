@@ -102,7 +102,8 @@ app/
     notifications.py inbox rows, unread counts, transition fan-out
     messaging.py     per-booking threads, rate limits, read state
     transcription.py Muse Voice Transcribe (WAV-only, diarization)
-    pdf_service.py   stub (library TBD)
+    notes.py         structured notes draft + citation reviewer
+    pdf_service.py   session-notes PDF (fpdf2, embedded Inter OFL)
 scripts/seed.py      idempotent synthetic seed (35 profs / 15 depts / 3 students)
 scripts/check_meta.py live Meta API smoke test (never run by pytest)
 scripts/make_samples.py regenerates samples/ fixtures

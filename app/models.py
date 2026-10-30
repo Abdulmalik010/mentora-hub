@@ -201,6 +201,7 @@ class SessionRecord(db.Model):
     turns = db.Column(db.JSON, nullable=True)
     speaker_map = db.Column(db.JSON, nullable=True)
     notes = db.Column(db.Text, nullable=True)
+    fidelity_rate = db.Column(db.Float, nullable=True)
     pdf_path = db.Column(db.String(500), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 

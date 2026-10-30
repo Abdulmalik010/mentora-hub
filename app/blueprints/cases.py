@@ -1,6 +1,7 @@
 """Student workspace: dashboard, intake, case detail, booking, sessions."""
 from __future__ import annotations
 
+import json
 import secrets
 import threading
 import uuid
@@ -43,6 +44,7 @@ from ..services.email_service import (
 )
 from ..services.messaging import get_threads, unread_message_count
 from ..services.notifications import notify_transition
+from ..services.pdf_service import build_session_notes_pdf
 from ..services.sessions import (
     STEP_EVENTS,
     get_session_record,
@@ -54,6 +56,7 @@ from ..services.sessions import (
     save_session_audio,
     swap_speaker_map,
 )
+from ..services.slots import format_wat
 from ..services.transcription import AudioRejected
 from ..services.wallet import demo_balance
 from ..services.extraction import ExtractionError, save_upload, validate_upload
@@ -780,6 +783,7 @@ def session_detail(booking_id: int) -> str:
         booking=booking,
         professor=professor,
         case=case,
+        record=get_session_record(booking.id),
     )
 
 
@@ -911,7 +915,56 @@ def session_room_swap_speakers(booking_id: int) -> Response:
     record.speaker_map = swap_speaker_map(record.speaker_map)
     db.session.commit()
     flash("Speaker roles swapped.", "success")
+    if request.form.get("next") == "transcript":
+        return redirect(
+            url_for("cases.session_transcript", booking_id=booking.id), code=303
+        )
     return redirect(url_for("cases.session_room", booking_id=booking.id), code=303)
+
+
+@bp.get("/sessions/<int:booking_id>/room/transcript")
+@login_required
+def session_transcript(booking_id: int) -> str:
+    """Transcript view with mapped speaker labels (parties only)."""
+    booking = _own_party_booking_or_404(booking_id)
+    record = get_session_record(booking.id)
+    if record is None or not record.turns:
+        abort(404)
+    student = db.session.get(User, booking.student_id)
+    professor = db.session.get(User, booking.professor_id)
+    return render_template(
+        "sessions/transcript.html",
+        booking=booking, record=record, turns=mapped_turns(record),
+        student=student, professor=professor,
+    )
+
+
+@bp.get("/sessions/<int:booking_id>/room/notes.pdf")
+@login_required
+def session_notes_pdf(booking_id: int) -> Response:
+    """Notes PDF download, regenerated from the database on demand."""
+    booking = _own_party_booking_or_404(booking_id)
+    record = get_session_record(booking.id)
+    if record is None or not record.notes:
+        abort(404)
+    student = db.session.get(User, booking.student_id)
+    professor = db.session.get(User, booking.professor_id)
+    pdf_bytes = build_session_notes_pdf(
+        student_name=student.display_name if student else "?",
+        professor_name=professor.display_name if professor else "?",
+        slot_text=format_wat(booking.scheduled_at) if booking.scheduled_at else "—",
+        final_notes=json.loads(record.notes),
+        fidelity_rate=record.fidelity_rate,
+    )
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=mentora-session-notes-{booking.id}.pdf"
+            )
+        },
+    )
 
 
 @bp.post("/sessions/<int:booking_id>/cancel")

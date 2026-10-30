@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card %}
+{% block title %}Session transcript · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-3xl px-4 py-10{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <p class="text-sm font-semibold text-brand"><a href="{{ url_for('cases.session_room', booking_id=booking.id) }}" class="hover:text-brand-hover">← Session room</a></p>
+  <h1 class="mt-1 font-display text-2xl font-semibold tracking-tight">Session transcript</h1>
+  <p class="mt-1 text-sm text-muted">{{ student.display_name }} × {{ professor.display_name }} · {{ booking.scheduled_at|wat }}</p>
+</div>
+{% call card() %}
+  <ol class="space-y-4">
+    {% for turn in turns %}
+      <li class="text-sm">
+        <p><strong class="font-semibold">{{ turn.name }}</strong>
+          <span class="text-xs tabular-nums text-muted">{{ "%02d:%02d" % (turn.start_ms // 60000, (turn.start_ms // 1000) % 60) }}–{{ "%02d:%02d" % (turn.end_ms // 60000, (turn.end_ms // 1000) % 60) }}</span></p>
+        <p class="mt-0.5 leading-relaxed">{{ turn.text }}</p>
+      </li>
+    {% endfor %}
+  </ol>
+  <form method="post" action="{{ url_for('cases.session_room_swap_speakers', booking_id=booking.id) }}" class="mt-6 border-t border-border pt-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="transcript">
+    <p class="text-xs text-muted">Roles assigned automatically: the first voice is shown as Professor.</p>
+    <button type="submit" class="mt-2 inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-ink shadow-sm hover:border-muted">Swap speakers</button>
+  </form>
+{% endcall %}
+{% endblock %}

@@ -33,6 +33,7 @@ KIND_CONFIRMED_PROFESSOR = "booking_confirmed_professor"
 KIND_CONFIRMED_STUDENT = "booking_confirmed_student"
 KIND_DECLINED_STUDENT = "booking_declined_student"
 KIND_CANCELLED_PROFESSOR = "booking_cancelled_professor"
+KIND_SESSION_NOTES_BASE = "session_notes"
 KIND_MESSAGE_BASE = "new_message"
 
 MESSAGE_EMAIL_BATCH = timedelta(hours=1)
@@ -52,6 +53,15 @@ class EmailRefused(EmailError):
 
 
 @dataclass(frozen=True)
+class EmailAttachment:
+    """One file attached to an outgoing email (bytes held in memory)."""
+
+    filename: str
+    content_type: str
+    data: bytes
+
+
+@dataclass(frozen=True)
 class OutgoingEmail:
     """One rendered email, before override handling."""
 
@@ -59,6 +69,7 @@ class OutgoingEmail:
     subject: str
     text: str
     html_body: str
+    attachments: tuple[EmailAttachment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -98,6 +109,7 @@ def apply_override(email: OutgoingEmail, override: str) -> OutgoingEmail:
             f"padding:8px 12px;border-radius:8px;\">{html.escape(banner)}</p>"
             f"{email.html_body}"
         ),
+        attachments=email.attachments,
     )
 
 
@@ -112,13 +124,23 @@ def _send_resend(
             f"refusing to send to sample address {email.to} "
             "(set DEMO_RECIPIENT_OVERRIDE for demos)"
         )
-    payload = {
+    payload: dict[str, Any] = {
         "from": from_address,
         "to": [email.to],
         "subject": email.subject,
         "html": email.html_body,
         "text": email.text,
     }
+    if email.attachments:
+        import base64
+
+        payload["attachments"] = [
+            {
+                "filename": item.filename,
+                "content": base64.b64encode(item.data).decode("ascii"),
+            }
+            for item in email.attachments
+        ]
     headers = {"Authorization": f"Bearer {api_key}"}
     last_error = "unknown error"
     for _ in range(SEND_ATTEMPTS):
@@ -159,6 +181,14 @@ def _send_outbox(
     )
     message.set_content(email.text)
     message.add_alternative(email.html_body, subtype="html")
+    for item in email.attachments:
+        maintype, _, subtype = item.content_type.partition("/")
+        message.add_attachment(
+            item.data,
+            maintype=maintype or "application",
+            subtype=subtype or "octet-stream",
+            filename=item.filename,
+        )
     filename = f"{uuid.uuid4().hex[:8]}.eml"
     with open(os.path.join(outbox_dir, filename), "wb") as handle:
         handle.write(message.as_bytes())
@@ -674,6 +704,77 @@ def build_cancelled_email(
         subject=f"Request cancelled: {student.display_name} — {slot}",
         text=text,
         html_body=html_body,
+    )
+
+
+def build_session_notes_email(
+    *, booking: Booking, professor: User, student: User,
+    summary: str, fidelity_rate: float | None, pdf_bytes: bytes,
+) -> OutgoingEmail:
+    """Student notes email with the PDF attached (override rules apply)."""
+    slot = format_wat(booking.scheduled_at) if booking.scheduled_at else "—"
+    fidelity = (
+        f"{fidelity_rate:.0%} of note items verified against the transcript."
+        if fidelity_rate is not None
+        else "Fidelity review pending."
+    )
+    text = "\n".join(
+        [
+            f"Your session notes with {professor.display_name} ({slot}) are ready.",
+            "",
+            summary,
+            "",
+            fidelity,
+            "The full notes are attached as a PDF.",
+            "",
+            "Sent from the Mentora Academic Hub demo.",
+        ]
+    )
+    html_body = f"""<div style="font-family:Arial,sans-serif;max-width:640px;color:#0B1B33">
+<div style="background:#0E6B5C;color:#fff;padding:16px 20px;border-radius:12px 12px 0 0">
+<strong>Session notes ready</strong>
+</div>
+<div style="border:1px solid #E7E2D9;border-top:none;padding:20px;border-radius:0 0 12px 12px">
+<p>Your session notes with <strong>{html.escape(professor.display_name)}</strong> ({html.escape(slot)}) are ready.</p>
+<p>{html.escape(summary)}</p>
+<p style="color:#5B6475;font-size:13px">{html.escape(fidelity)} The full notes are attached as a PDF.</p>
+<p style="color:#5B6475;font-size:13px">Sent from the Mentora Academic Hub demo.</p>
+</div></div>"""
+    return OutgoingEmail(
+        to=student.email,
+        subject=f"Session notes: {professor.display_name} — {slot}",
+        text=text,
+        html_body=html_body,
+        attachments=(
+            EmailAttachment(
+                filename=f"mentora-session-notes-{booking.id}.pdf",
+                content_type="application/pdf",
+                data=pdf_bytes,
+            ),
+        ),
+    )
+
+
+def send_session_notes_email(
+    booking_id: int, run_id: str, pdf_bytes: bytes,
+    summary: str, fidelity_rate: float | None,
+) -> EmailLog | None:
+    """Notes PDF to the student; idempotent per (booking, run).
+
+    The run-scoped kind keeps re-executions of one run from double
+    sending while still emailing fresh notes after a new upload.
+    """
+    parties = _booking_parties(booking_id)
+    if parties is None:
+        return None
+    booking, _case, professor, student = parties
+    return send_logged_email(
+        booking_id=booking.id,
+        kind=f"{KIND_SESSION_NOTES_BASE}:{run_id}",
+        email=build_session_notes_email(
+            booking=booking, professor=professor, student=student,
+            summary=summary, fidelity_rate=fidelity_rate, pdf_bytes=pdf_bytes,
+        ),
     )
 
 

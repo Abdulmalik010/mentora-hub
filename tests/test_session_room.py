@@ -6,6 +6,7 @@ import itertools
 import wave
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 from flask import Flask
 
@@ -25,6 +26,57 @@ from tests.test_booking import login_sample_student, seed_booking_case
 from tests.test_professor import login_professor
 
 _key_counter = itertools.count(1)
+
+CANNED_DRAFT: dict[str, Any] = {
+    "summary": "Reviewed OLS assumptions and robust standard errors.",
+    "key_points": [{"text": "Use HC3 standard errors.", "turns": [1]}],
+    "concepts_explained": [
+        {
+            "term": "Heteroskedasticity",
+            "explanation": "Non-constant error variance.",
+            "turns": [0],
+        }
+    ],
+    "decisions": [],
+    "action_items": [
+        {
+            "owner": "student",
+            "task": "Rerun regressions with robust errors.",
+            "due": "Friday",
+            "turns": [1],
+        }
+    ],
+    "resources": [],
+    "open_questions": [],
+    "next_session_suggestion": {"text": "Review chapter 4.", "turns": [1]},
+}
+
+CANNED_VERDICTS: dict[str, Any] = {
+    "verdicts": [
+        {"section": "key_points", "index": 0, "label": "supported"},
+        {"section": "concepts_explained", "index": 0, "label": "supported"},
+        {"section": "action_items", "index": 0, "label": "supported"},
+        {"section": "next_session_suggestion", "index": 0, "label": "supported"},
+    ]
+}
+
+
+def canned_draft(turns: list[dict[str, Any]]) -> dict[str, Any]:
+    """Deterministic notes draft for worker tests."""
+    import json
+
+    assert turns, "drafting needs turns"
+    return json.loads(json.dumps(CANNED_DRAFT))
+
+
+def canned_review(
+    draft: dict[str, Any], turns: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """All-supported verdicts for the canned draft."""
+    import json
+
+    assert draft.get("summary")
+    return json.loads(json.dumps(CANNED_VERDICTS))
 
 
 def wav_bytes(
@@ -236,7 +288,7 @@ def test_upload_outside_window_blocked(app: Flask) -> None:
 
 
 def test_pipeline_transcribes_and_cleans_up(app: Flask, tmp_path: Path) -> None:
-    """Worker persists turns + mapping, deletes audio, logs both steps."""
+    """Worker persists turns + mapping, deletes audio, runs all six steps."""
     booking = accepted_booking()
     tmp = tmp_path / "audio"
     tmp.mkdir()
@@ -248,20 +300,27 @@ def test_pipeline_transcribes_and_cleans_up(app: Flask, tmp_path: Path) -> None:
     )
     db.session.add(record)
     db.session.commit()
-    run_session_pipeline(app, booking.id, "run-room-1", fake_transcript)
+    run_session_pipeline(
+        app, booking.id, "run-room-1", fake_transcript,
+        canned_draft, canned_review,
+    )
     db.session.refresh(record)
-    assert record.status == "transcribed"
+    assert record.status == "emailed"
     assert record.transcript == "Second voice. First voice."
     assert len(record.turns or []) == 2
     assert record.speaker_map == {"SPEAKER_0": "Professor", "SPEAKER_1": "Student"}
     assert not audio.exists()  # deleted unless KEEP_AUDIO
     assert record.audio_path is None
+    assert (record.notes or "") != ""
     types = [
         event.type
         for event in RunEvent.query.filter_by(run_id="run-room-1")
         .order_by(RunEvent.seq).all()
     ]
-    assert types == ["audio_received", "transcribed"]
+    assert types == [
+        "audio_received", "transcribed", "notes_drafted", "notes_reviewed",
+        "pdf_built", "email_sent",
+    ]
 
 
 def test_pipeline_keep_audio_and_failure(
@@ -280,9 +339,12 @@ def test_pipeline_keep_audio_and_failure(
     db.session.add(record)
     db.session.commit()
     monkeypatch.setenv("KEEP_AUDIO", "true")
-    run_session_pipeline(app, booking.id, "run-room-1", fake_transcript)
+    run_session_pipeline(
+        app, booking.id, "run-room-1", fake_transcript,
+        canned_draft, canned_review,
+    )
     db.session.refresh(record)
-    assert record.status == "transcribed"
+    assert record.status == "emailed"
     assert audio.exists()
     monkeypatch.delenv("KEEP_AUDIO", raising=False)
 
@@ -391,7 +453,9 @@ def test_reupload_resets_record(app: Flask, monkeypatch) -> None:  # type: ignor
     """A second upload supersedes the first run's output entirely."""
     monkeypatch.setattr(
         "app.blueprints.cases._launch_session_pipeline",
-        lambda a, b, r: run_session_pipeline(a, b, r, fake_transcript),
+        lambda a, b, r: run_session_pipeline(
+            a, b, r, fake_transcript, canned_draft, canned_review
+        ),
     )
     app.config["DEMO_ALLOW_ANYTIME"] = True
     booking = accepted_booking()
@@ -399,12 +463,12 @@ def test_reupload_resets_record(app: Flask, monkeypatch) -> None:  # type: ignor
     login_sample_student(client)
     upload(client, booking.id, wav_bytes())
     record = SessionRecord.query.filter_by(booking_id=booking.id).one()
-    assert record.status == "transcribed"
+    assert record.status == "emailed"
     first_run = record.run_id
     upload(client, booking.id, wav_bytes())
     db.session.refresh(record)
     assert record.run_id != first_run
-    assert record.status == "transcribed"  # sync fake re-ran
+    assert record.status == "emailed"  # sync fake re-ran
     assert record.transcript == "Second voice. First voice."
 
 

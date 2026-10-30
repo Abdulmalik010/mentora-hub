@@ -56,6 +56,11 @@
     <div><dt class="text-muted">Session room</dt>
       <dd><a href="{{ url_for('cases.session_room', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Open session room →</a></dd>
     </div>
+    {% if record and record.notes %}
+    <div><dt class="text-muted">Session notes</dt>
+      <dd><a href="{{ url_for('cases.session_notes_pdf', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Download PDF ↓</a></dd>
+    </div>
+    {% endif %}
   </dl>
   {% if booking.status == "requested" %}
     <form method="post" action="{{ url_for('cases.student_cancel', booking_id=booking.id) }}" class="mt-5 border-t border-border pt-4">

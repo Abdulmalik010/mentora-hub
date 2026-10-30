@@ -53,6 +53,15 @@
       {% endif %}
     {% endcall %}
 
+    {% if record and record.notes %}
+      {% call card("Notes") %}
+        <p class="mt-2 text-sm text-muted">Reviewed notes are ready{% if record.fidelity_rate is not none %} · fidelity {{ "%.0f"|format(record.fidelity_rate * 100) }}%{% endif %}.</p>
+        <p class="mt-2 flex flex-wrap gap-4 text-sm">
+          <a href="{{ url_for('cases.session_notes_pdf', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">Download PDF ↓</a>
+          <a href="{{ url_for('cases.session_transcript', booking_id=booking.id) }}" class="font-semibold text-brand hover:text-brand-hover">View transcript →</a>
+        </p>
+      {% endcall %}
+    {% endif %}
     {% if turns %}
       {% call card("Transcript") %}
         <ol class="mt-2 space-y-3">

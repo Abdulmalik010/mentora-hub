@@ -13,7 +13,8 @@
   </div>
 </div>
 <div class="mt-3 flex flex-wrap gap-2">
-  {% if professor.is_sample %}{{ badge("Sample profile", tone="warn") }}{% endif %}
+  {% if professor.is_sample %}{{ badge("Sample profile", tone="warn") }}{% else %}{{ badge("Self-registered", tone="brand") }}{% endif %}
+  {% if profile.accepting_new is false %}{{ badge("Not accepting requests", tone="neutral") }}{% endif %}
   {% for area in profile.research_areas %}
     {{ badge(area, tone="brand") }}
   {% endfor %}
@@ -23,14 +24,11 @@
     <p class="mt-2 text-sm leading-relaxed">{{ profile.bio }}</p>
   {% endcall %}
   {% call card("Availability") %}
-    <p class="mt-2 text-sm text-muted">
-      {{ (profile.availability or {}).get("days", [])|join(", ") or "By arrangement" }}
-      · {{ (profile.availability or {}).get("hours", "") }}
-    </p>
+    <p class="mt-2 text-sm text-muted">{{ profile.availability|avail_summary }}</p>
     {% if profile.rate is not none %}
       <p class="mt-2 text-sm">
         <strong class="font-semibold">{{ profile.rate|ngn }}</strong>
-        <span class="text-muted">/ session (sample pricing)</span>
+        <span class="text-muted">/ session ({% if professor.is_sample %}sample pricing{% else %}demo{% endif %})</span>
       </p>
     {% endif %}
     <div class="mt-4">

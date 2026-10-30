@@ -160,7 +160,7 @@
               {% endif %}
               <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-sm">
                 <p class="text-muted">Next open slot: <strong class="font-semibold text-ink">{{ m.next_slot or "on request" }}</strong>
-                  {% if p.rate is not none %}<span>· {{ p.rate|ngn }}/session (sample pricing)</span>{% endif %}
+                  {% if p.rate is not none %}<span>· {{ p.rate|ngn }}/session ({% if prof.is_sample %}sample pricing{% else %}demo{% endif %})</span>{% endif %}
                 </p>
                 <a href="{{ url_for('cases.book_form', case_id=case.id, professor_id=prof.id) }}"
                     class="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover">

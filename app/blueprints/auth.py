@@ -90,6 +90,8 @@ def register() -> Response | tuple[str, int]:
     db.session.commit()
     session["user_id"] = user.id
     flash("Registered and logged in.", "ok")
+    if role == "professor":
+        return redirect(url_for("profiles.setup"))
     return redirect(url_for("index"))
 
 

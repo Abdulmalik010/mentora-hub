@@ -158,7 +158,7 @@ def seed_database() -> dict[str, int]:
             "timezone": "Africa/Lagos",
             "availability": {
                 "days": ["Monday", "Wednesday", "Friday"][0 : (i % 3) + 1],
-                "hours": "10:00-14:00 WAT",
+                "windows": [["10:00", "14:00"]],
             },
         }
         if user.professor_profile is None:

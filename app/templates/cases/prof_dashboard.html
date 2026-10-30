@@ -153,13 +153,19 @@
           <dd>{% if profile.research_areas %}{% for area in profile.research_areas %}{{ badge(area) }} {% endfor %}{% else %}—{% endif %}</dd>
         </div>
         <div><dt class="text-muted">Bio</dt><dd class="text-muted">{{ profile.bio or "—" }}</dd></div>
-        <div><dt class="text-muted">Rate</dt><dd>{% if profile.rate is not none %}{{ profile.rate|ngn }}/session (sample pricing){% else %}—{% endif %}</dd></div>
+        <div><dt class="text-muted">Rate</dt><dd>{% if profile.rate is not none %}{{ profile.rate|ngn }}/session ({% if current_user.is_sample %}sample pricing{% else %}demo{% endif %}){% else %}—{% endif %}</dd></div>
         <div><dt class="text-muted">Timezone</dt><dd>{{ profile.timezone or "—" }}</dd></div>
         <div><dt class="text-muted">Weekly availability</dt>
-          <dd>{{ (profile.availability or {}).get("days", [])|join(", ") or "—" }} · {{ (profile.availability or {}).get("hours", "") }}</dd>
+          <dd>{{ profile.availability|avail_summary }}</dd>
+        </div>
+        <div><dt class="text-muted">Accepting new requests</dt>
+          <dd>{{ "Yes" if profile.accepting_new is not false else "No" }}</dd>
         </div>
       </dl>
-      <p class="mt-4 text-sm"><a href="{{ url_for('professors.detail', user_id=current_user.id) }}" class="font-semibold text-brand hover:text-brand-hover">View public profile →</a></p>
+      <p class="mt-4 flex flex-wrap gap-4 text-sm">
+        <a href="{{ url_for('profiles.edit') }}" class="font-semibold text-brand hover:text-brand-hover">Edit profile →</a>
+        <a href="{{ url_for('professors.detail', user_id=current_user.id) }}" class="font-semibold text-brand hover:text-brand-hover">View public profile →</a>
+      </p>
     {% endcall %}
   {% else %}
     {{ empty_state("No profile yet", "Your public profile will appear here once it is set up.", icon_name="doc") }}

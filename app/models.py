@@ -73,9 +73,10 @@ class ProfessorProfile(db.Model):
     department = db.Column(db.String(120), nullable=False, index=True)
     research_areas = db.Column(db.JSON, nullable=False, default=list)
     bio = db.Column(db.Text, nullable=False, default="")
-    rate = db.Column(db.Float, nullable=True)  # unit decided at booking step
+    rate = db.Column(db.Float, nullable=True)  # whole naira per session
     timezone = db.Column(db.String(64), nullable=False, default="Africa/Lagos")
     availability = db.Column(db.JSON, nullable=False, default=dict)
+    accepting_new = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     user = db.relationship("User", back_populates="professor_profile")

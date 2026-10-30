@@ -16,6 +16,7 @@ from typing import Any
 from .diagnosis import json_dumps, log_event, normalize_text
 from ..extensions import db
 from ..models import CaseFile, MatchResult, ProfessorProfile, User
+from .slots import availability_windows
 from .meta_client import (
     ChatClient,
     ChatResult,
@@ -167,6 +168,8 @@ def search_professors(
     scored: list[tuple[int, dict[str, Any]]] = []
     profiles = ProfessorProfile.query.all()
     for profile in profiles:
+        if profile.accepting_new is False:
+            continue
         if department and profile.department.lower() != department.lower():
             continue
         areas = normalize_text(" ".join(profile.research_areas or []))
@@ -225,7 +228,11 @@ def check_availability(professor_id: int, days: int = 14) -> dict[str, Any]:
         return {"error": f"unknown professor_id: {professor_id}"}
     availability = profile.availability or {}
     open_days = availability.get("days", []) or []
-    hours = availability.get("hours", "")
+    spans = ", ".join(
+        f"{opens.strftime('%H:%M')}-{closes.strftime('%H:%M')}"
+        for opens, closes in availability_windows(availability)
+    )
+    hours = f"{spans} WAT" if spans else ""
     window = min(60, max(1, days))
     today = date.today()
     slots = []

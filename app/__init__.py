@@ -27,6 +27,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     from .blueprints.cases import bp as cases_bp
     from .blueprints.inbox import bp as inbox_bp
     from .blueprints.notifications import bp as notifications_bp
+    from .blueprints.profiles import bp as profiles_bp
     from .blueprints.professors import bp as professors_bp
 
     app.register_blueprint(cases_bp)
@@ -36,6 +37,7 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
     app.register_blueprint(agent_bp, url_prefix="/agent")
     app.register_blueprint(notifications_bp)
     app.register_blueprint(inbox_bp)
+    app.register_blueprint(profiles_bp)
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -83,6 +85,24 @@ def create_app(config_override: dict[str, Any] | None = None) -> Flask:
             return ""
         moment = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
         return moment.astimezone(timezone.utc).isoformat()
+
+    @app.template_filter("avail_summary")
+    def format_avail_summary(value: object) -> str:
+        """Weekly availability dict as ``"Mon, Wed · 10:00-14:00 WAT"``."""
+        from .services.slots import availability_windows
+
+        if not isinstance(value, dict):
+            return "By arrangement"
+        days = [str(day)[:3] for day in value.get("days", []) or []]
+        spans = ", ".join(
+            f"{opens.strftime('%H:%M')}-{closes.strftime('%H:%M')}"
+            for opens, closes in availability_windows(value)
+        )
+        if not days and not spans:
+            return "By arrangement"
+        return f"{', '.join(days) or '—'} · {spans} WAT" if spans else (
+            ", ".join(days)
+        )
 
     @app.get("/")
     def index() -> str:

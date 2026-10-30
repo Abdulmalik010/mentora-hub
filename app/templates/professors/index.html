@@ -3,7 +3,7 @@
 {% block title %}Professors · Mentora Academic Hub{% endblock %}
 {% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
 {% block content %}
-{{ section_header("Professors", "Browse sample profiles by specialty or department.") }}
+{{ section_header("Professors", "Browse professors by specialty or department.") }}
 <form method="get" action="{{ url_for('professors.index') }}" class="mb-6 flex flex-col gap-3 md:flex-row">
   <label for="q" class="sr-only">Search by keyword</label>
   <input id="q" name="q" type="search" value="{{ query }}" placeholder="e.g. econometrics, thesis writing…"
@@ -27,7 +27,7 @@
               <a href="{{ url_for('professors.detail', user_id=hit.professor_id) }}" class="font-display text-lg font-semibold hover:text-brand">{{ hit.display_name }}</a>
               <p class="mt-0.5 text-sm text-muted">{{ hit.department }}</p>
             </div>
-            {% if hit.is_sample %}{{ badge("Sample profile", tone="warn") }}{% endif %}
+            {% if hit.is_sample %}{{ badge("Sample profile", tone="warn") }}{% else %}{{ badge("Self-registered", tone="brand") }}{% endif %}
           </div>
           <div class="mt-3 flex flex-wrap gap-1.5">
             {% for area in hit.research_areas %}
@@ -35,7 +35,7 @@
             {% endfor %}
           </div>
           {% if hit.rate is not none %}
-            <p class="mt-3 text-sm text-muted">{{ hit.rate|ngn }}/session <span class="text-xs">(sample pricing)</span></p>
+            <p class="mt-3 text-sm text-muted">{{ hit.rate|ngn }}/session <span class="text-xs">({% if hit.is_sample %}sample pricing{% else %}demo{% endif %})</span></p>
           {% endif %}
         {% endcall %}
       </li>

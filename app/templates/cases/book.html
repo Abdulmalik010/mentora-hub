@@ -68,7 +68,7 @@
     {% call card("Session summary") %}
       <dl class="mt-2 space-y-3 text-sm">
         <div><dt class="text-muted">Professor</dt><dd class="font-semibold">{{ professor.display_name }}</dd></div>
-        <div><dt class="text-muted">Rate</dt><dd>{% if profile.rate is not none %}{{ profile.rate|ngn }}/session (sample pricing){% else %}On request{% endif %}</dd></div>
+        <div><dt class="text-muted">Rate</dt><dd>{% if profile.rate is not none %}{{ profile.rate|ngn }}/session ({% if professor.is_sample %}sample pricing{% else %}demo{% endif %}){% else %}On request{% endif %}</dd></div>
         <div><dt class="text-muted">Your problem</dt><dd>{{ case.problem_text }}</dd></div>
         {% set d = case.diagnosis or {} %}
         {% if d.get("core_problem") %}

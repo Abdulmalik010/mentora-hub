@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% from "_ui.html" import card, button, badge, section_header %}
+{% block title %}{% if role == "professor" %}{{ "Complete your profile" if setup else "Edit profile" }}{% else %}Profile{% endif %} · Mentora Academic Hub{% endblock %}
+{% block main_class %}mx-auto max-w-6xl px-4 py-10{% endblock %}
+{% block content %}
+{% if role == "professor" %}
+  {% if setup %}
+    {{ section_header("Complete your profile", "Step 2 of 2 — this is what students and the matcher see.") }}
+  {% else %}
+    {{ section_header("Edit profile", "This is what students and the matcher see.") }}
+  {% endif %}
+  <div class="grid items-start gap-6 lg:grid-cols-5">
+    <div class="lg:col-span-3">
+      {% call card("Details") %}
+        <form method="post" action="{{ post_url }}" id="profile-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="grid gap-4 sm:grid-cols-3">
+            <label class="block text-sm">Title
+              <select name="title" id="prof-title" class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                {% for option in titles %}
+                  <option value="{{ option }}" {% if data.title == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="block text-sm">First name
+              <input name="first_name" id="prof-first" value="{{ data.first_name }}" required maxlength="80" autocomplete="off"
+                class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            </label>
+            <label class="block text-sm">Last name
+              <input name="last_name" id="prof-last" value="{{ data.last_name }}" required maxlength="80" autocomplete="off"
+                class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            </label>
+          </div>
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <label class="block text-sm">Rank
+              <select name="rank" id="prof-rank" class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                {% for option in ranks %}
+                  <option value="{{ option }}" {% if data.rank == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="block text-sm">Department
+              <select name="department" id="prof-dept" class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                {% for option in departments %}
+                  <option value="{{ option }}" {% if data.department == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <label class="mt-4 block text-sm">Research areas (comma-separated, up to 8)
+            <input name="research_areas" id="prof-areas" value="{{ data.research_areas }}" autocomplete="off"
+              placeholder="e.g. Econometrics, Policy evaluation"
+              class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+          </label>
+          <label class="mt-4 block text-sm">Bio
+            <textarea name="bio" id="prof-bio" rows="4" maxlength="2000"
+              class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">{{ data.bio }}</textarea>
+          </label>
+          <div class="mt-4 grid gap-4 sm:grid-cols-2">
+            <label class="block text-sm">Rate (₦ per session, demo credits)
+              <input name="rate" id="prof-rate" type="number" min="0" step="1" value="{{ data.rate }}"
+                class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            </label>
+            <label class="block text-sm">Timezone (IANA name)
+              <input name="timezone" id="prof-tz" value="{{ data.timezone }}" list="tz-list" autocomplete="off"
+                placeholder="Africa/Lagos"
+                class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+              <datalist id="tz-list">
+                <option value="Africa/Lagos"></option>
+                <option value="UTC"></option>
+                <option value="Europe/London"></option>
+                <option value="America/New_York"></option>
+                <option value="Asia/Singapore"></option>
+              </datalist>
+            </label>
+          </div>
+          <fieldset class="mt-4">
+            <legend class="text-sm font-medium">Available days</legend>
+            <div class="mt-2 flex flex-wrap gap-2">
+              {% for day in weekdays %}
+                <label class="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm has-checked:border-brand has-checked:bg-brand-tint">
+                  <input type="checkbox" name="days" value="{{ day }}" {% if day in data.days %}checked{% endif %} class="h-4 w-4 accent-[#0E6B5C]">
+                  {{ day[:3] }}
+                </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          <fieldset class="mt-4">
+            <legend class="text-sm font-medium">Time windows (whole hours, no overlaps)</legend>
+            <div id="window-rows" class="mt-2 space-y-2">
+              {% for opens, closes in (data.windows or [("", "")]) %}
+                <div class="flex items-center gap-2" data-window-row>
+                  <input type="time" name="window_opens" value="{{ opens }}" step="3600" aria-label="Opens"
+                    class="rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                  <span class="text-muted">–</span>
+                  <input type="time" name="window_closes" value="{{ closes }}" step="3600" aria-label="Closes"
+                    class="mt-0 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                  <button type="button" data-remove-window class="rounded-lg px-2 py-1 text-sm font-semibold text-danger hover:bg-danger/10" aria-label="Remove window">✕</button>
+                </div>
+              {% endfor %}
+            </div>
+            <button type="button" id="add-window" class="mt-2 rounded-lg border border-border bg-card px-4 py-1.5 text-sm font-semibold hover:border-muted">+ Add window</button>
+          </fieldset>
+          <label class="mt-4 flex cursor-pointer items-start gap-3 text-sm">
+            <input type="checkbox" name="accepting_new" value="yes" {% if data.accepting_new %}checked{% endif %} class="mt-0.5 h-4 w-4 accent-[#0E6B5C]">
+            <span><strong class="font-semibold">Accepting new requests.</strong><br>
+            <span class="text-muted">Off hides you from matching and the directory.</span></span>
+          </label>
+          <div class="mt-6">{{ button("Complete setup" if setup else "Save profile") }}</div>
+        </form>
+      {% endcall %}
+    </div>
+    <div class="lg:col-span-2">
+      <div class="lg:sticky lg:top-20">
+        {% call card("Live preview") %}
+          <p class="mt-1 text-xs text-muted">Your public card, as students see it.</p>
+          <div class="mt-3 flex items-start gap-3">
+            <span id="pv-initials" class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand font-semibold text-white" aria-hidden="true">?</span>
+            <div class="min-w-0">
+              <p id="pv-name" class="font-display text-lg font-semibold">—</p>
+              <p id="pv-sub" class="text-sm text-muted">—</p>
+            </div>
+          </div>
+          <p id="pv-areas" class="mt-3 text-sm text-muted">—</p>
+          <p class="mt-2 text-sm"><strong id="pv-rate" class="font-semibold">—</strong> <span class="text-muted">/ session (demo)</span></p>
+          <p id="pv-avail" class="mt-1 text-xs text-muted">—</p>
+        {% endcall %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  {{ section_header("Profile", "Your student details.") }}
+  <div class="max-w-xl">
+    {% call card("Details") %}
+      <form method="post" action="{{ post_url }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label class="block text-sm">Name
+          <input name="display_name" value="{{ data.display_name }}" required maxlength="120"
+            class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+        </label>
+        <label class="mt-4 block text-sm">Level
+          <input name="level" value="{{ data.level }}" required maxlength="20" placeholder="undergraduate, masters, phd…"
+            class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+        </label>
+        <label class="mt-4 block text-sm">Field of study
+          <input name="field" value="{{ data.field }}" required maxlength="120"
+            class="mt-1 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+        </label>
+        <div class="mt-6">{{ button("Save profile") }}</div>
+      </form>
+    {% endcall %}
+  </div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if role == "professor" %}
+<script>
+  (function () {
+    var rows = document.getElementById('window-rows');
+    var add = document.getElementById('add-window');
+    function wireRemove(scope) {
+      scope.querySelectorAll('[data-remove-window]').forEach(function (btn) {
+        if (btn.dataset.wired) { return; }
+        btn.dataset.wired = '1';
+        btn.addEventListener('click', function () {
+          var row = btn.closest('[data-window-row]');
+          if (rows && row && rows.querySelectorAll('[data-window-row]').length > 1) { row.remove(); }
+          else if (row) { row.querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
+          updatePreview();
+        });
+      });
+    }
+    if (add && rows) {
+      wireRemove(rows);
+      add.addEventListener('click', function () {
+        var first = rows.querySelector('[data-window-row]');
+        if (!first) { return; }
+        var clone = first.cloneNode(true);
+        clone.querySelectorAll('input').forEach(function (i) { i.value = ''; });
+        clone.querySelectorAll('[data-remove-window]').forEach(function (b) { delete b.dataset.wired; });
+        rows.appendChild(clone);
+        wireRemove(rows);
+      });
+    }
+    function val(id) {
+      var el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    }
+    function setText(id, text) {
+      var el = document.getElementById(id);
+      if (el) { el.textContent = text; }
+    }
+    function updatePreview() {
+      var name = [val('prof-title'), val('prof-first'), val('prof-last')].filter(Boolean).join(' ');
+      setText('pv-name', name || '—');
+      var initials = ((val('prof-first').slice(0, 1) + val('prof-last').slice(0, 1)) || '?').toUpperCase();
+      setText('pv-initials', initials);
+      var rank = val('prof-rank'), dept = document.getElementById('prof-dept');
+      setText('pv-sub', [rank, dept ? dept.value : ''].filter(Boolean).join(' · ') || '—');
+      setText('pv-areas', val('prof-areas') || '—');
+      var rate = val('prof-rate');
+      setText('pv-rate', rate ? ('₦' + Number(rate).toLocaleString('en-US')) : '—');
+      var days = Array.prototype.map.call(
+        document.querySelectorAll('input[name="days"]:checked'), function (c) { return c.value.slice(0, 3); });
+      var spans = [];
+      document.querySelectorAll('[data-window-row]').forEach(function (row) {
+        var inputs = row.querySelectorAll('input');
+        if (inputs[0].value && inputs[1].value) { spans.push(inputs[0].value + '–' + inputs[1].value); }
+      });
+      setText('pv-avail', (days.join(', ') || '—') + (spans.length ? ' · ' + spans.join(', ') : ''));
+    }
+    var form = document.getElementById('profile-form');
+    if (form) {
+      form.addEventListener('input', updatePreview);
+      form.addEventListener('change', updatePreview);
+      updatePreview();
+    }
+  })();
+</script>
+{% endif %}
+{% endblock %}

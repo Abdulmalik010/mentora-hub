@@ -36,6 +36,7 @@
           </summary>
           <div class="absolute right-0 mt-2 w-48 rounded-xl border border-border bg-card p-2 shadow-md">
             <p class="px-3 py-1.5 text-xs text-muted">{{ current_user.role|capitalize }} account</p>
+            <a href="{{ url_for('profiles.edit') }}" class="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-paper">Profile</a>
             <form method="post" action="{{ url_for('auth.logout') }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-paper">Log out</button>
@@ -66,6 +67,7 @@
         {% endif %}
         <a href="{{ url_for('professors.index') }}" class="py-1">Professors</a>
         <a href="{{ url_for('notifications.inbox') }}" class="py-1">Notifications{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a>
+        <a href="{{ url_for('profiles.edit') }}" class="py-1">Profile</a>
         <form method="post" action="{{ url_for('auth.logout') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="py-1 text-left">Log out ({{ current_user.display_name }})</button>

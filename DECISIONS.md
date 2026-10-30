@@ -91,3 +91,7 @@
 - 2026-10-30: Messaging rate limit is 20/minute/user, DB-backed (holds across processes); 429 with the thread re-rendered.
 - 2026-10-30: Message pings batch to one notification per thread per 10 minutes and one email per thread per hour (hour-bucketed kind keeps idempotency without blocking later pings).
 - 2026-10-30: Part C needs no fresh dev DB (new table only).
+- 2026-10-30: Part D ADDS professor_profiles.accepting_new (Boolean, default True); db.create_all cannot add columns, so the dev DB must be recreated (delete instance/mentora.db, re-run seed).
+- 2026-10-30: Availability format is {"days": [...], "windows": [["HH:MM","HH:MM"], ...]}; the legacy "hours" string still parses via a fallback, but the editor only writes windows (whole-hour, non-overlapping; one shared window set for all days).
+- 2026-10-30: search_professors skips accepting_new=False, so matching and the directory exclude opt-outs; direct profile URLs still render with a "Not accepting requests" badge.
+- 2026-10-30: Professor registration creates a bare profile and redirects to /profile/setup; self-registered professors (is_sample=False) show a "Self-registered" badge and "(demo)" pricing instead of sample labels.
